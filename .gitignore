@@ -1,0 +1,56 @@
+# Generated .gitignore for Haskell Stack/Cabal project
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Stack
+.stack-work/
+.stack-work
+.stack-work/*
+
+# Cabal
+dist/
+dist-newstyle/
+*.hi
+*.o
+*.prof
+*.aux
+*.hp
+*.hpc
+
+# GHC and build artifacts
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+*.rsp
+*.so
+*.dll
+*.dylib
+*.a
+*.lib
+
+# GHCi
+.ghci.history
+
+# Binary and executable files
+*.exe
+*.out
+*.app
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Misc
+cabal.sandbox.config
+
+# Generated project files
+dist-newstyle/
