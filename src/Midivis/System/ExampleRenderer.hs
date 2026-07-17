@@ -8,4 +8,4 @@ draw = return drawExampleText
 
 step :: Float -> System' ()
 step _ = return ()
-drawExampleWindow = play (InWindow "Example Window" (800, 600) (1,1)) black 60 draw handleEvent step
+drawExampleWindow = play (InWindow "Example Window" (800, 600) (100,100)) black 60 draw handleEvent step

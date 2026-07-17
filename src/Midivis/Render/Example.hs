@@ -1,4 +1,4 @@
 module Midivis.Render.Example where
 import Apecs.Gloss
 drawExampleText :: Picture
-drawExampleText = Text "This is an example window"
+drawExampleText =  (color white) (Text "This is an example window")
