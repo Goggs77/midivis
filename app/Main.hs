@@ -1,8 +1,11 @@
 module Main where
 
-import qualified MyLib (someFunc)
+import Midivis.World
+import Midivis.System.ExampleRenderer (drawExampleWindow)
 
 main :: IO ()
 main = do
   putStrLn "Hello, Haskell!"
-  MyLib.someFunc
+  initWorld >>= runSystem drawExampleWindow
+    
+

@@ -67,7 +67,10 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  MyLib
+    exposed-modules:  Midivis.World,
+                      Midivis.Render.Example,
+                      Midivis.System.ExampleRenderer,
+                      Midivis.EventHandler
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -85,13 +88,13 @@ library
                       vector,
                       extra,
                       template-haskell,
-                      proteaaudio == 0.10.1,
+                      proteaaudio >= 0.10.1,
                       binary,
                       bytestring,
                       file-embed
 
     -- Directories containing source files.
-    hs-source-dirs:   src
+    hs-source-dirs:   src\
 
     -- Base language which the package is written in.
     default-language: Haskell2010
@@ -111,8 +114,11 @@ executable midivis
 
     -- Other library packages from which modules are imported.
     build-depends:
-        base ^>=4.17.2.1,
-        midivis
+                      base ^>=4.17.2.1,
+                      midivis,
+                      apecs,
+                      apecs-gloss,
+                      gloss
 
     -- Directories containing source files.
     hs-source-dirs:   app
@@ -144,5 +150,17 @@ test-suite midivis-test
 
     -- Test dependencies.
     build-depends:
-        base ^>=4.17.2.1,
-        midivis
+                      base ^>=4.17.2.1,
+                      midivis,
+                      apecs,
+                      apecs-gloss,
+                      gloss,
+                      random,
+                      linear,
+                      vector,
+                      extra,
+                      template-haskell,
+                      proteaaudio >= 0.10.1,
+                      binary,
+                      bytestring,
+                      file-embed
