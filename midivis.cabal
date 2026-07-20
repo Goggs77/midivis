@@ -70,7 +70,13 @@ library
     exposed-modules:  Midivis.World,
                       Midivis.Render.Example,
                       Midivis.System.ExampleRenderer,
-                      Midivis.EventHandler
+                      Midivis.EventHandler,
+                      Midivis.Midi.MidiParser,
+                      Midivis.Midi.MidiEventType,
+                      Midivis.Tuning.TuningParser,
+                      Midivis.Resources.Tuning.EDO,
+                      Midivis.Resources.Tuning.Default,
+                      Midivis.Resources.Tuning.FiveSeven
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -79,7 +85,7 @@ library
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.17.2.1,
+    build-depends:    base ^>=4.20.1.0,
                       apecs,
                       apecs-gloss,
                       gloss,
@@ -91,7 +97,10 @@ library
                       proteaaudio >= 0.10.1,
                       binary,
                       bytestring,
-                      file-embed
+                      file-embed,
+                      RtMidi
+
+
 
     -- Directories containing source files.
     hs-source-dirs:   src\
@@ -114,11 +123,11 @@ executable midivis
 
     -- Other library packages from which modules are imported.
     build-depends:
-                      base ^>=4.17.2.1,
+                      base ^>=4.20.1.0,
                       midivis,
                       apecs,
                       apecs-gloss,
-                      gloss
+                      RtMidi
 
     -- Directories containing source files.
     hs-source-dirs:   app
@@ -150,7 +159,7 @@ test-suite midivis-test
 
     -- Test dependencies.
     build-depends:
-                      base ^>=4.17.2.1,
+                      base ^>=4.20.1.0,
                       midivis,
                       apecs,
                       apecs-gloss,
@@ -163,4 +172,5 @@ test-suite midivis-test
                       proteaaudio >= 0.10.1,
                       binary,
                       bytestring,
-                      file-embed
+                      file-embed,
+                      RtMidi
