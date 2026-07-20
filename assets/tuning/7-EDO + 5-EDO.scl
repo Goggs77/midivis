@@ -1,0 +1,24 @@
+! 7-EDO + 5-EDO.ascl
+!
+The 7 white keys are tuned in 7edo. The 5 black keys are tuned in 5edo. B♭ and B are tuned to the same pitch, so that the 11 different pitches in one keyboard octave occur in rising order.
+!
+! default tuning: degree 0 = 261.625565 Hz (12edo C tuning) *OR* degree 0 = 268.1830039 Hz (so that degree 9 = 440 Hz)
+!
+12
+!
+68.57142857 ! 1\5
+171.4285714 ! 2\7
+308.5714286 ! 2\5
+342.8571429 ! 3\7
+514.2857143 ! 4\7
+548.5714286 ! 3\5
+685.7142857 ! 5\7
+788.5714286 ! 4\5
+857.1428571 ! 6\7
+1028.571429 ! 0\5
+1028.571429 ! 0\7
+2/1 ! 1\7
+!
+! @ABL NOTE_NAMES "1\7 " "1\5 " "2\7 " "2\5 " "3\7 " "4\7 " "3\5 " "5\7 " "4\5 " "6\7 " "0\5 " "0\7 "
+! @ABL REFERENCE_PITCH 3 0 261.625565
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/7-edo+5-edo
