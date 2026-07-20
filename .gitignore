@@ -51,6 +51,11 @@ dist-newstyle/
 
 # Misc
 cabal.sandbox.config
+*.zip
+*.7z
+*.tar.gz
+rtmidifix/
+freeglut/
 
 # Generated project files
 dist-newstyle/

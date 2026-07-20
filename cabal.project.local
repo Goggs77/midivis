@@ -1,0 +1,7 @@
+ignore-project: False
+tests: False
+benchmarks: False
+optimization: False
+
+program-options
+  ghc-options: +RTS -M256m -A32m -RTS
