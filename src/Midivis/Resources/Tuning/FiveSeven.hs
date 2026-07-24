@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Midivis.Resources.Tuning.FiveSeven where
-import qualified Data.ByteString as BS
 import Data.FileEmbed
+import Midivis.Tuning.TuningParser 
 
-scala = $(embedFileRelative "assets/tuning/7-EDO + 5-EDO.scl")
+$(makeTuning "FiveSeven" (parseScala $(embedFileRelative "assets/tuning/7-EDO + 5-EDO.scl")))
+-- Actually, there's no type mismatch afterall, reboot HLS solved it
