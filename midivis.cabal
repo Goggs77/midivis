@@ -76,7 +76,8 @@ library
                       Midivis.Tuning.TuningParser,
                       Midivis.Resources.Tuning.EDO,
                       Midivis.Resources.Tuning.Default,
-                      Midivis.Resources.Tuning.FiveSeven
+                      Midivis.Resources.Tuning.FiveSeven,
+                      Midivis.Util.THUtils
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -98,7 +99,8 @@ library
                       binary,
                       bytestring,
                       file-embed,
-                      RtMidi
+                      RtMidi,
+                      text
 
 
 
