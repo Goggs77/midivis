@@ -1,4 +1,4 @@
-module Midivis.World(World(..), MidiEventBuffer(..), initWorld) where
+module Midivis.World(World(..), MidiEventBuffer, pack, unpack, initWorld) where
 
 import qualified Data.Vector.Storable as V
 import Data.Vector.Storable
@@ -16,3 +16,9 @@ data World = World
 
 initWorld :: World
 initWorld = World {midiEvtBuf = mempty}
+
+unpack :: MidiEventBuffer -> Vector MidiEvent
+unpack (MidiEventBuffer v) = v
+
+pack :: Vector MidiEvent -> MidiEventBuffer
+pack = MidiEventBuffer
