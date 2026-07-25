@@ -13,7 +13,7 @@ data MidiEventType = NoteOff -- [128 143]
                    | MIDITimeCodeQuarterFrame -- 241; see specs
                    | SongPositionPointer -- 242; L R
                    | SongSelect -- 243; 0-127, none
-                   | Undefined244
+                   | Undefined244 -- occupied for testing
                    | Undefined245
                    | TuneRequest -- 246
                    | EOX -- 247
@@ -25,6 +25,7 @@ data MidiEventType = NoteOff -- [128 143]
                    | Undefined253
                    | ActiveSensing -- 254
                    | SystemReset -- 255
+                   deriving (Show, Eq, Enum)
 
 toChannelEvent :: Word8 -> (Int, MidiEventType)
 toChannelEvent wd =
