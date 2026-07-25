@@ -1,2 +1,3 @@
 packages: .
           ./rtmidifix/RtMidi-0.8.0.0
+          ./newerGlossRelative/gloss-relative
