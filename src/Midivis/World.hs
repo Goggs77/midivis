@@ -1,19 +1,18 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+module Midivis.World(World(..), MidiEventBuffer(..), initWorld) where
 
-module Midivis.World(World, initWorld, runSystem, System') where
+import qualified Data.Vector.Storable as V
+import Data.Vector.Storable
+import Midivis.Midi.MidiParser (MidiEvent)
 
-import Apecs as A
-import Apecs.Gloss
-import Linear
-import qualified Data.Vector as V
+newtype MidiEventBuffer = MidiEventBuffer (Vector MidiEvent) 
+instance Show MidiEventBuffer where show (MidiEventBuffer buf) = show $ V.toList buf
+instance Semigroup MidiEventBuffer where (MidiEventBuffer a) <> (MidiEventBuffer b) =MidiEventBuffer $ a V.++ b 
+instance Monoid MidiEventBuffer where mempty = MidiEventBuffer( V.fromList [] )
 
-makeWorld "World" [''Camera]
-type System' a = System World a
+data World = World 
+    {
+        midiEvtBuf :: MidiEventBuffer
+    }
+
+initWorld :: World
+initWorld = World {midiEvtBuf = mempty}
