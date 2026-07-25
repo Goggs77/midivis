@@ -5,8 +5,7 @@ import Midivis.System.ExampleRenderer
 
 main :: IO ()
 main = do
-    w <- initWorld
-    chan <- newChan
-    drawExampleRelative w chan
+    let w0 = initWorld
+    drawExampleRelative w0
 
 
