@@ -1,7 +1,7 @@
 module Midivis.EventHandler where
-import Apecs
-import Apecs.Gloss
+import Graphics.Gloss.Relative
 import Midivis.World
+import Sound.RtMidi
 
-handleEvent :: Event -> System' ()
-handleEvent _ = return ()
+handleEvent :: Event -> World -> IO World
+handleEvent _ w = return w

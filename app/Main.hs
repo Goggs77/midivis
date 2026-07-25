@@ -1,11 +1,12 @@
 module Main where
 
 import Midivis.World
-import Midivis.System.ExampleRenderer (drawExampleWindow)
+import Midivis.System.ExampleRenderer 
 
 main :: IO ()
 main = do
-  putStrLn "Hello, Haskell!"
-  initWorld >>= runSystem drawExampleWindow
-    
+    w <- initWorld
+    chan <- newChan
+    drawExampleRelative w chan
+
 
