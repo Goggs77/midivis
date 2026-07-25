@@ -16,4 +16,4 @@ drawRelativeFrame :: World -> IO Frame
 drawRelativeFrame w = return $ 
     
     zoom (Relative 0.5) (Relative 0.5) alignCenter $ 
-        thickEllipse (rgba 1 1 1 1) (Absolute 5.0)
+        thickEllipse (rgba 1 1 1 1) (Absolute 1.0)
