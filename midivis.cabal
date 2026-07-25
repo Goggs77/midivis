@@ -70,6 +70,7 @@ library
     exposed-modules:  Midivis.World,
                       Midivis.Render.Example,
                       Midivis.System.ExampleRenderer,
+                      Midivis.System.MidiQuery,
                       Midivis.EventHandler,
                       Midivis.Midi.MidiParser,
                       Midivis.Midi.MidiEventType,
@@ -87,9 +88,7 @@ library
 
     -- Other library packages from which modules are imported.
     build-depends:    base ^>=4.20.1.0,
-                      apecs,
-                      apecs-gloss,
-                      gloss,
+                      gloss-relative,
                       random,
                       linear,
                       vector,
@@ -127,8 +126,6 @@ executable midivis
     build-depends:
                       base ^>=4.20.1.0,
                       midivis,
-                      apecs,
-                      apecs-gloss,
                       RtMidi
 
     -- Directories containing source files.
@@ -163,9 +160,7 @@ test-suite midivis-test
     build-depends:
                       base ^>=4.20.1.0,
                       midivis,
-                      apecs,
-                      apecs-gloss,
-                      gloss,
+                      gloss-relative,
                       random,
                       linear,
                       vector,
