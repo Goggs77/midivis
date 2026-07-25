@@ -56,19 +56,27 @@ cleanBuffer w0 = do
     let buf = V.toList (unpack $ midiEvtBuf w0)
         noteOns  = filter (\e -> evt e == NoteOn) buf
         noteOffs = filter (\e -> evt e == NoteOff) buf
-        processedOns = dropSameId noteOffs noteOns
-        -- all NoteOffs must be eliminated, so no need to process, as the error below
+        notePpA  = filter (\e -> evt e == PolyphonicAftertouch) buf
+        notePB   = filter (\e -> evt e == PitchBendChange) buf
+        processedOns = dropSameIdWith noteOffs noteOns
+        processedPpA = takeSameIdWith processedOns notePpA
+        processedPB  = takeSameIdWith processedOns notePB
     {-putStrLn $ "[Debug] Original Buffer: " ++ show buf
     putStrLn $ "[Debug] Original Ons: " ++ show noteOns
     putStrLn $ "[Debug] Original Offs: " ++ show noteOffs-}
     if (length noteOns >= length noteOffs) 
         then
-            putStrLn ("[Debug] Cleaned Buffer: " ++ show processedOns) >>
-            return w0{midiEvtBuf = pack $ V.fromList processedOns} 
+            putStrLn ("[Debug] Cleaned Buffer: " ++ show (processedOns ++ processedPpA ++ processedPB)) >>
+            return w0{midiEvtBuf = pack $ V.fromList (processedOns ++ processedPpA ++ processedPB)} 
+        -- all NoteOffs must be eliminated, so no need to process, as the error below
         else error "Note On/Off mismatch"
     where
-        dropSameId [] ys = ys
-        dropSameId (x:xs) ys = 
+        dropSameIdWith [] ys = ys
+        dropSameIdWith (x:xs) ys = 
             -- drop the first sameId element
             let newYs = (takeWhile (sameValueL x) ys) ++ (drop 1 $ dropWhile (sameValueL x) ys)
-            in dropSameId xs newYs
+            in dropSameIdWith xs newYs
+        takeSameIdWith [] _ = []
+        takeSameIdWith (x:xs) ys = 
+            let ys' = (filter (sameValueL x) ys)
+            in ys' ++ takeSameIdWith xs ys

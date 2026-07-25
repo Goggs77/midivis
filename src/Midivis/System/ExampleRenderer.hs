@@ -15,7 +15,7 @@ drawExampleRelative w0 = do
     playRelativeIO
         (InWindow "Example Relative Window" (800,600) (100,100))
         black
-        1000
+        2000 -- poll per 0.5 ms (2KHz)
         w0
         drawRelativeFrame
         handleEvent

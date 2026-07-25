@@ -42,6 +42,10 @@ instance Storable MidiEvent where
         pokeElemOff intPtr 2 vL
         pokeElemOff intPtr 3 vR
 
+createMidiEvent :: (Integral a1, Integral a2) => Int -> MidiEventType -> a1 -> a2 -> Maybe MidiEvent
+createMidiEvent chan ev b1 b2 = Just $ MidiEvent chan ev (fromIntegral b1) (fromIntegral b2)
+                
+
 sameValueL :: MidiEvent -> MidiEvent -> Bool
 sameValueL e1 e2 = (valueL e1) == (valueR e2)
 
@@ -63,11 +67,11 @@ parseThreeByteMessage bytes startIdx
         in
             -- Only parse if it's a valid 3-byte channel message for notes
             case eventType of
-                NoteOff -> Just $ MidiEvent chan NoteOff (fromIntegral dataByte1) (fromIntegral dataByte2)
-                NoteOn -> Just $ MidiEvent chan NoteOn (fromIntegral dataByte1) (fromIntegral dataByte2)
-                PolyphonicAftertouch -> Just $ MidiEvent chan PolyphonicAftertouch (fromIntegral dataByte1) (fromIntegral dataByte2)
-                ControlOrModeChange -> Just $ MidiEvent chan ControlOrModeChange (fromIntegral dataByte1) (fromIntegral dataByte2)
-                PitchBendChange -> Just $ MidiEvent chan PitchBendChange (fromIntegral dataByte1) (fromIntegral dataByte2)
+                NoteOff              -> createMidiEvent chan NoteOff dataByte1 dataByte2
+                NoteOn               -> createMidiEvent chan NoteOn dataByte1 dataByte2
+                PolyphonicAftertouch -> createMidiEvent chan PolyphonicAftertouch dataByte1 dataByte2
+                ControlOrModeChange  -> createMidiEvent chan ControlOrModeChange dataByte1 dataByte2
+                PitchBendChange      -> createMidiEvent chan PitchBendChange dataByte1 dataByte2
                 _ -> Nothing  -- Not a 3-byte message
 
 -- Parse all 3-byte MIDI messages from a vector of bytes
