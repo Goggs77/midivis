@@ -2,11 +2,10 @@
 module Midivis.Midi.MidiParser where
 import Midivis.Midi.MidiEventType
 import qualified Data.Vector.Storable as V
-import Data.Vector.Storable
-import Data.Vector.Storable (Vector)
+import Data.Vector.Storable ( fromList, Vector )
 import Data.Word (Word8)
 import Foreign.Storable
-import Foreign.Ptr (castPtr, plusPtr)
+import Foreign.Ptr (castPtr)
 
 
 data MidiEvent = MidiEvent 
@@ -15,7 +14,11 @@ data MidiEvent = MidiEvent
         evt::MidiEventType,
         valueL::Int, -- usually noteid, channel aftertouch pressure, or pitchbender LSB
         valueR::Int  -- usually velocity, value, polyphonic aftertouch pressure, or pitchbender MSB
-    } deriving (Show, Eq)
+    } deriving (Eq)
+instance Show MidiEvent where 
+    show (MidiEvent ch ev vL vR) = "MidiEvent {" ++ 
+        show ev ++ "@chan: " ++ show ch ++ " w/ (L,R): (" ++ show vL ++ "," ++ show vR ++ ")}"
+
 instance Storable MidiEvent where
 
     sizeOf :: MidiEvent -> Int
@@ -38,6 +41,9 @@ instance Storable MidiEvent where
         pokeElemOff intPtr 1 (fromEnum ev)
         pokeElemOff intPtr 2 vL
         pokeElemOff intPtr 3 vR
+
+sameValueL :: MidiEvent -> MidiEvent -> Bool
+sameValueL e1 e2 = (valueL e1) == (valueR e2)
 
 -- Simply parse one msg
 parse :: Vector Word8 -> Maybe MidiEvent
