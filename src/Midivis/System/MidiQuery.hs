@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 module Midivis.System.MidiQuery where
 
 import qualified Data.Vector.Storable as V
@@ -31,30 +32,27 @@ forever :: Monad m => m a -> m b
 forever a = a >> forever a
 
 
-
+-- | Initialize midi, don't block thread
 initMidi :: IO (InputDevice)
 initMidi  = do
-    --_ <- forkIO $ forever $ do
-    --    (delta, msg) <- readChan chan 
-    --    putStrLn $ "[Debug] " ++ show delta ++ " " ++ show msg
     i <- defaultInput
     openPort i 0 "Midivis"
     return (i)
 
--- feed it readChan chan when used
+-- | Fill in MidiEventBuffer with MidiEvent(s), also avoid thread blocking operations
 bufferMidi :: InputDevice -> World -> IO World
 bufferMidi inputDevice w0 = do
     --The delta::Double in getMessage's return tuple represents
     -- the time elapsed in seconds since the previous MIDI message was received.
     (delta, msg) <- getMessageSized inputDevice 32
-    --delta == 0.0 and msg is empty vector <- when queue is empty
+    --when queue is empty, delta == 0.0 and msg is empty vector
     --not using callback so there's no warning and empty return
-    {-putStrLn $ "[Debug] Parsing midi, delta: " ++ show delta-}
     let mEvt = parse msg
     case mEvt of
-        Nothing -> {-(putStrLn "[Debug] Nothing to append") >>-} return w0
-        Just e  -> {-(putStrLn $ "[Debug] Appended " ++ show e) >>-} appendMidiEvent e w0
+        Nothing -> return w0 -- suppresse
+        Just e  -> appendMidiEvent e w0
 
+-- | Clean up MidiEventBuffer, also avoid thread blocking operations and speed-up calculations
 cleanBuffer :: World -> IO World
 cleanBuffer w0 = do
     let buf = (unpack $ midiEvtBuf w0)
@@ -65,15 +63,12 @@ cleanBuffer w0 = do
         processedOns = filterSortedByKey valueL noteOffs noteOns
         processedPpA = takeSameIdWith valueL processedOns notePpA
         processedPB  = takeSameIdWith valueL processedOns notePB
-    {-putStrLn $ "[Debug] Original Buffer: " ++ show buf
-    putStrLn $ "[Debug] Original Ons: " ++ show noteOns
-    putStrLn $ "[Debug] Original Offs: " ++ show noteOffs-}
     if (V.length noteOns >= V.length noteOffs) 
         then
-            putStrLn ("[Debug] Cleaned Buffer: " ++ show (processedOns V.++ processedPpA V.++ processedPB)) >>
             return w0{midiEvtBuf = pack $  (processedOns V.++ processedPpA V.++ processedPB)} 
         -- all NoteOffs must be eliminated, so no need to process, as the error below
-        else error "Note On/Off mismatch" --Known error that this is triggered when using Shift+Control on MiniLab 3
+        else error "Note On/Off mismatch" 
+        --Known error that this is triggered when using Shift+Control on MiniLab 3
 
 -- | Removes ys' elements that has the same extractKey in xs, better when unsorted
 dropSameIdWith :: (Hashable k, Eq k, V.Storable a, V.Storable k) => (a -> k) -> Vector a -> Vector a -> Vector a

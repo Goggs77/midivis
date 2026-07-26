@@ -90,6 +90,7 @@ library
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
+    -- We can't use GLFW-only since gloss always calls GLUT
     build-depends:    base ^>=4.20.1.0,
                       gloss-relative,
                       random,
@@ -97,16 +98,20 @@ library
                       vector,
                       extra,
                       template-haskell,
-                      proteaaudio >= 0.10.1,
                       binary,
                       bytestring,
                       file-embed,
-                      RtMidi,
                       text,
                       unordered-containers,
                       hashable,
-                      vector-algorithms
-
+                      vector-algorithms,
+                      -- audio processing
+                      RtMidi,
+                      storablevector, 
+                      bindings-portaudio,
+                      synthesizer-core,
+                      -- concurrent needs
+                      stm
 
 
     -- Directories containing source files.
@@ -132,7 +137,8 @@ executable midivis
     build-depends:
                       base ^>=4.20.1.0,
                       midivis,
-                      RtMidi
+                      RtMidi,
+                      stm ^>=2.5.3.1,
 
     -- Directories containing source files.
     hs-source-dirs:   app
@@ -165,15 +171,4 @@ test-suite midivis-test
     -- Test dependencies.
     build-depends:
                       base ^>=4.20.1.0,
-                      midivis,
-                      gloss-relative,
-                      random,
-                      linear,
-                      vector,
-                      extra,
-                      template-haskell,
-                      proteaaudio >= 0.10.1,
-                      binary,
-                      bytestring,
-                      file-embed,
-                      RtMidi
+                      midivis
