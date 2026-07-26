@@ -3,7 +3,7 @@ module Midivis.Tuning.Scala where
     
 data Scala = Scala
     {
-        name :: String, -- unset above
+        name :: String, -- find Name Literals at Resources.Tuning, where they are set during TH
         lowestFreq :: Double,
         synopsis :: String,
         count :: Integer,
@@ -35,4 +35,7 @@ getFreq scl noteID = freq where
 getGeneralName :: Integral a => Scala -> a -> String
 getGeneralName scl noteID =
     let (q, r) = fromIntegral noteID `quotRem` count scl
-    in show r ++ ":" ++ show q --allow q=0
+        noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    in if name scl == "EDO12"
+       then (noteNames !! fromIntegral r) ++ show q
+       else show r ++ "/" ++ show q

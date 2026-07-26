@@ -76,14 +76,15 @@ library
                         Midivis.Midi.MidiEventType,
                         Midivis.Tuning.TuningParser,
                         Midivis.Tuning.Scala,
-                        Midivis.Resources.Tuning.All,
+                        Midivis.Resources.Tuning.All
 
     -- sorry but keep it ascii
     other-modules:      Midivis.Resources.Tuning.Default,
                         Midivis.Resources.Tuning.EDO,
                         Midivis.Resources.Tuning.JustIntonation,
                         Midivis.Resources.Tuning.Dastgah,
-                        Midivis.Util.THUtils
+                        Midivis.Util.THUtils,
+                        Midivis.Util.Math
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:

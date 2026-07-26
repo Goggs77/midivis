@@ -42,7 +42,7 @@ bufferMidi :: InputDevice -> World -> IO World
 bufferMidi inputDevice w0 = do
     --The delta::Double in getMessage's return tuple represents
     -- the time elapsed in seconds since the previous MIDI message was received.
-    (delta, msg) <- getMessage inputDevice
+    (delta, msg) <- getMessageSized inputDevice 32
     --delta == 0.0 and msg is empty vector <- when queue is empty
     --not using callback so there's no warning and empty return
     {-putStrLn $ "[Debug] Parsing midi, delta: " ++ show delta-}
