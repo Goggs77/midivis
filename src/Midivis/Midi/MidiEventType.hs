@@ -1,5 +1,8 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Midivis.Midi.MidiEventType where
 import Data.Word (Word8)
+import GHC.Generics (Generic)
+import Data.Hashable (Hashable)
 --Expanded MIDI 1.0 Messages
 
 data MidiEventType = NoteOff -- [128 143]
@@ -25,7 +28,8 @@ data MidiEventType = NoteOff -- [128 143]
                    | Undefined253
                    | ActiveSensing -- 254
                    | SystemReset -- 255
-                   deriving (Show, Eq, Enum)
+                   deriving (Show, Eq, Enum, Generic)
+instance Hashable MidiEventType
 
 toChannelEvent :: Word8 -> (Int, MidiEventType)
 toChannelEvent wd =

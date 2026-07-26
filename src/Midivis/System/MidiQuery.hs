@@ -3,7 +3,8 @@ module Midivis.System.MidiQuery where
 
 import qualified Data.Vector.Storable as V
 import Data.Vector.Storable (Vector)
-
+import qualified Data.HashSet as H
+import Data.Hashable
 import Sound.RtMidi
 
 import Midivis.Midi.MidiParser
@@ -58,9 +59,9 @@ cleanBuffer w0 = do
         noteOffs = filter (\e -> evt e == NoteOff) buf
         notePpA  = filter (\e -> evt e == PolyphonicAftertouch) buf
         notePB   = filter (\e -> evt e == PitchBendChange) buf
-        processedOns = dropSameIdWith noteOffs noteOns
-        processedPpA = takeSameIdWith processedOns notePpA
-        processedPB  = takeSameIdWith processedOns notePB
+        processedOns = dropSameIdWith valueL noteOffs noteOns
+        processedPpA = takeSameIdWith valueL processedOns notePpA
+        processedPB  = takeSameIdWith valueL processedOns notePB
     {-putStrLn $ "[Debug] Original Buffer: " ++ show buf
     putStrLn $ "[Debug] Original Ons: " ++ show noteOns
     putStrLn $ "[Debug] Original Offs: " ++ show noteOffs-}
@@ -70,13 +71,14 @@ cleanBuffer w0 = do
             return w0{midiEvtBuf = pack $ V.fromList (processedOns ++ processedPpA ++ processedPB)} 
         -- all NoteOffs must be eliminated, so no need to process, as the error below
         else error "Note On/Off mismatch"
-    where
-        dropSameIdWith [] ys = ys
-        dropSameIdWith (x:xs) ys = 
-            -- drop the first sameId element
-            let newYs = (takeWhile (sameValueL x) ys) ++ (drop 1 $ dropWhile (sameValueL x) ys)
-            in dropSameIdWith xs newYs
-        takeSameIdWith [] _ = []
-        takeSameIdWith (x:xs) ys = 
-            let ys' = (filter (sameValueL x) ys)
-            in ys' ++ takeSameIdWith xs ys
+
+
+dropSameIdWith :: (Hashable k, Eq k) => (a -> k) -> [a] -> [a] -> [a]
+dropSameIdWith extractKey xs ys =
+    let forbiddenKeys = H.fromList (map extractKey xs)
+    in filter (not . (`H.member` forbiddenKeys) . extractKey) ys
+
+takeSameIdWith :: (Hashable k, Eq k) => (a -> k) -> [a] -> [a] -> [a]
+takeSameIdWith extractKey xs ys =
+    let forbiddenKeys = H.fromList (map extractKey xs)
+    in filter ((`H.member` forbiddenKeys) . extractKey) ys

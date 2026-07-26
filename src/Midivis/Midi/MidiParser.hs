@@ -1,4 +1,5 @@
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Midivis.Midi.MidiParser where
 import Midivis.Midi.MidiEventType
 import qualified Data.Vector.Storable as V
@@ -6,6 +7,8 @@ import Data.Vector.Storable ( fromList, Vector )
 import Data.Word (Word8)
 import Foreign.Storable
 import Foreign.Ptr (castPtr)
+import Data.Hashable (Hashable)
+import GHC.Generics (Generic)
 
 
 data MidiEvent = MidiEvent 
@@ -14,10 +17,12 @@ data MidiEvent = MidiEvent
         evt::MidiEventType,
         valueL::Int, -- usually noteid, channel aftertouch pressure, or pitchbender LSB
         valueR::Int  -- usually velocity, value, polyphonic aftertouch pressure, or pitchbender MSB
-    } deriving (Eq)
+    } deriving (Eq, Generic)
+
 instance Show MidiEvent where 
     show (MidiEvent ch ev vL vR) = "MidiEvent {" ++ 
         show ev ++ "@chan: " ++ show ch ++ " w/ (L,R): (" ++ show vL ++ "," ++ show vR ++ ")}"
+instance Hashable MidiEvent
 
 instance Storable MidiEvent where
 
