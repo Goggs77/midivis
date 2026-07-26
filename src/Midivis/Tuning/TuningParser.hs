@@ -1,18 +1,18 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-module Midivis.Tuning.TuningParser(Tuning(..), Scala(..), parseScala, makeTuning) where
+{-# OPTIONS_GHC -Wno-unused-local-binds #-}
+module Midivis.Tuning.TuningParser(Tuning(..), Scala(..), parseScala, makeScala) where
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8')
 import Data.List.Extra ( trim )
-import Data.Char ( isAlpha )
 import Data.Ratio ( (%) )
 
 import Midivis.Util.THUtils
 import Language.Haskell.TH
+import Data.Char (toLower)
     
-import Language.Haskell.TH.Syntax
 --MIDI supports [0 127] note range. we fit each note periodically
 class Tuning a where
     period :: a -> Integer
@@ -61,6 +61,7 @@ removeCommentsPreP scl =
 
 data Scala = Scala
     {
+        name :: String, -- unset above
         synopsis :: String,
         count :: Integer,
         pitches :: [Double]
@@ -91,7 +92,6 @@ parsePitch s =
                 _ -> error "Invalid pitch format in .scl"
                         
 
-
 parseScala :: BS.ByteString -> Scala
 parseScala str =
     let 
@@ -102,12 +102,44 @@ parseScala str =
         valid = fromIntegral cnt == length ps
     in
         if valid 
-            then Scala snps cnt (map parsePitch ps) 
+            then Scala "" snps cnt (map parsePitch ps) 
             else error "Mismatch between declared note count and the actual line count in .scl"
 
---just one line of impurity, should be fine
+
+makeScala :: String -> Scala -> Q [Dec]
+makeScala name' (Scala _ syn cnt pit) = do
+    let firstLow (c:cs) = (toLower c) : cs
+        count = mkName "count"
+        name = mkName "scl_name"
+        newScl = mkName (firstLow name')
+        pitches = mkName "pitches"
+        scl = mkName "scl"
+        scl_count = mkName "scl_count"
+        scl_pitches = mkName "scl_pitches"
+        scl_synopsis = mkName "scl_synopsis"
+        qName = qkExpToValD name (LitE (StringL name'))
+        qSyn = qkExpToValD scl_synopsis (LitE (StringL syn))
+        qCount = qkExpToValD scl_count (LitE (IntegerL cnt))
+        qPitches = qkListDouble scl_pitches (pit)
+        qScl =
+            ValD
+            (VarP newScl)
+            ( NormalB
+                ( AppE
+                    ( AppE
+                        (AppE (AppE (ConE 'Scala) (VarE name)) (VarE scl_synopsis))
+                        (VarE scl_count)
+                    )
+                    (VarE scl_pitches)
+                )
+            )
+            []
+    return [qName, qSyn, qCount, qPitches, qScl]
+
+
+--deprecated
 makeTuning :: String -> Scala -> Q [Dec]
-makeTuning sclName (Scala syn cnt pit) = do
+makeTuning sclName (Scala _ syn cnt pit) = do
     let newdata = mkName sclName
         calibrate = mkName "calibrate"
         calibrateA4 = mkName "calibrateA4"
