@@ -15,7 +15,7 @@ drawExampleRelative w0 = do
     inputDevice <- initMidi
     putStrLn "[Debug] Midi Initialized"
     playRelativeIO
-        (InWindow "Example Relative Window" (800,600) (100,100))
+        (InWindow "Example Relative Window" (1151,809) (100,100))
         black
         1000 -- poll per 1 ms (1KHz)
         w0
