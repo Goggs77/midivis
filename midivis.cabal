@@ -104,7 +104,8 @@ library
                       RtMidi,
                       text,
                       unordered-containers,
-                      hashable
+                      hashable,
+                      vector-algorithms
 
 
 

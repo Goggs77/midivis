@@ -41,7 +41,7 @@ mapToRadii w0 clr =
         phaseDiff = 2*pi/fromIntegral (length freqs)
         angles = take (length freqs) (iterate (+phaseDiff) (baseAngle w0))
         -- zip for processing
-        zipped = zip3 angles (scaleNumLog (1) (20000) 0.2 1 freqs) names 
+        zipped = zip3 angles (scaleNumLog (c0) (20000) 0.0 1 freqs) names 
     in Overlay $ map (uncurry3 (customRadius clr)) zipped
 
 
@@ -49,7 +49,7 @@ mapToRadii w0 clr =
 customRadius :: Color -> Double -> Double -> String -> Frame
 customRadius clr angle radius na  =
     zoom (Relative 0.05) (Relative 0.05) (alignAt p2) (banner na clr) <>
-    aspect (1,1) alignCenter (zoom (Relative 0.1) (Relative 0.1) (alignAt p2) (solidEllipse (0.2 `withAlpha` clr))) <>
+    aspect (1,1) alignCenter (zoom (Relative 0.1) (Relative 0.1) (alignAt p2) (solidEllipse (0.05 `withAlpha` clr))) <>
     stroke [
         (Relative 0, Relative 0), 
         p2 .* 0.86
