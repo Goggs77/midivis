@@ -79,8 +79,11 @@ library
                       Midivis.Resources.Tuning.All,
                       Midivis.Util.THUtils
 
-    -- Modules included in this library but not exported.
-    -- other-modules:
+    -- sorry but keep it ascii
+    other-modules:      Midivis.Resources.Tuning.Default,
+                        Midivis.Resources.Tuning.EDO,
+                        Midivis.Resources.Tuning.JustIntonation,
+                        Midivis.Resources.Tuning.Dastgah 
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
