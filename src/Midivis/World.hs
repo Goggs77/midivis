@@ -4,7 +4,7 @@ import qualified Data.Vector.Storable as V
 import Data.Vector.Storable
 
 import Midivis.Midi.MidiParser (MidiEvent)
-import Midivis.Resources.Tuning.FiveSeven
+import Midivis.Resources.Tuning.All
 import Midivis.Tuning.TuningParser
 
 newtype MidiEventBuffer = MidiEventBuffer (Vector MidiEvent) 

@@ -75,9 +75,8 @@ library
                       Midivis.Midi.MidiParser,
                       Midivis.Midi.MidiEventType,
                       Midivis.Tuning.TuningParser,
-                      Midivis.Resources.Tuning.EDO,
-                      Midivis.Resources.Tuning.Default,
-                      Midivis.Resources.Tuning.FiveSeven,
+                      Midivis.Tuning.Scala,
+                      Midivis.Resources.Tuning.All,
                       Midivis.Util.THUtils
 
     -- Modules included in this library but not exported.

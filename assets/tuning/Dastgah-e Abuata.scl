@@ -1,0 +1,23 @@
+! Dastgah-e Abuata.ascl
+!
+Dastgāh-e Abuatā (sometimes Āvāz-e Abuatā) is one of the extensions of Dastgāh-e Šur. Abuatā is mainly used in Iranian religious music, such as the call to prayer (Azān) or recitation of the Quran, usually in the (Guše: sub-mode) of Hejaz. This version of Abuatā has C as the first scale degree (aqaz).
+!
+! Hints:
+! First degree/tone of the scale = serves only for the cadences and is always resolved to the second degree.
+! Second degree/tone of the scale = as the finalis
+! Third degree/tone of the scale = could serve as the starting point of the improvisation / also, it is the 1st tone for this mode
+! Fifth degree/tone of the scale = as the starting point of the improvisation
+!
+6
+!
+205.
+340.
+500.
+700.
+905.
+1200.
+!
+! @ABL NOTE_NAMES "C" "D" "E koron" "F" "G" "A"
+! @ABL REFERENCE_PITCH 3 0 261.63
+! @ABL NOTE_RANGE_BY_INDEX -7 0 14 1
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/dastgah-e-abuata

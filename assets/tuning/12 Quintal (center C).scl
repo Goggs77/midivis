@@ -1,0 +1,28 @@
+! 12 Quintal (center C).ascl
+!
+12-tone quintal Rational Intonation scale, derived from harmonic series intervals up to a prime limit of 5, centered on C. Also commonly known as Ptolemaic tuning.
+!
+! default tuning: degree 9 (5/3) 440 Hz, or degree 0 = 264 Hz .... note that the starting C is tuned higher than 12edo so that A4 has the same tuning in both scales
+!
+! 12-quintal (5-limit Just Intonation/Ptolemaic) centered on C
+!
+! Commonly known as Ptolemaic tuning, after Claudius Ptolemy, who identified the sequence of proportions 8:9, 9:10, 15:16. The two tones of slightly different size combine to produce a major third in the proportion 4:5, which combines with the semitone to produce a perfect fourth 3:4. The diatonic major scale with central pitch C combines two conjunct "tetrachords", one rising from G to C, and another rising from C to F, followed by a 8:9 wholetone between F and G to reach an octave 1:2. This tuning produces concordant major triads in the proportion 4:5:6 on C, F, and G. Similarly, the melodic minor scale (Aeolian mode) centered on C is produced by tuning three concordant minor triads in the proportion 10:12:15 on C, F, and G, deriving the notes E♭, A♭, B♭. The two remaining notes of the 12-tone chromatic scale are derived as the Neapolitan D♭ (diatonic minor 2nd, a perfect fifth below A♭) and the secondary Dominant F♯ (augmented fourth, a major third above D). Note that the interval from D to A is NOT a perfect fifth. To obtain a concordant major triad on D, A must be raised by a Syntonic Comma in the proportion 80:81 (approximately 21.5 cents).
+!
+12
+!
+16/15 ! ^D♭
+9/8 ! D
+6/5 ! ^E♭
+5/4 ! vE
+4/3 ! F
+45/32 ! vF♯
+3/2 ! G
+8/5 ! ^A♭
+5/3 ! vA
+9/5 ! ^B♭
+15/8 ! vB
+2/1 ! C
+!
+! @ABL NOTE_NAMES "C" "^D♭" "D" "^E♭" "vE" "F" "vF♯" "G" "^A♭" "vA" "^B♭" "vB"
+! @ABL REFERENCE_PITCH 3 9 440.0
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/12-quintal-center-c

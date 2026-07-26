@@ -1,0 +1,71 @@
+! 55 Tertial-Quintal Sabat Euler Lattice.ascl
+!
+55-tone tertial-quintal Rational Intonation scale, based on Marc Sabat's string quartet "Euler Lattice Spirals Scenery".
+55
+!
+! default tuning: degree 0 = 260.740741 Hz / degree 41 = 440 Hz .... matching the C in quintal tuning.
+!
+! 55-tertial-quintal (Sabat Euler Lattice)
+!
+! 55-tone tertial-quintal Rational Intonation scale, based on the primary roots of major and minor triads in the "Harmonium for Ben Johnston" section of Marc Sabat's string quartet "Euler Lattice Spirals Scenery". The tertial diatonic tones are each divided in the same symmetric pattern of 9 "commas". To divide the interval C 1/1 - D 9/8 add two notes above C: 81/80 and 25/24, then add two more notes one Syntonic Comma above each of these. Similarly, add two notes below D: 10/9 and 27/25; then, add two more notes a Syntonic Comma below each of these. To divide the diatonic limmas E-F and B-C, add two successive Syntonic Commas upward from the lower note and two commas downward from the higher note, reaching a point of enharmonic near-equivalence (these two "pairs" of proximal enharmonics extend the tuning from 53 to 55 notes per octave).
+!
+81/80 ! ^C
+6561/6400 ! ^^C
+25/24 ! vvC♯
+135/128 ! vC♯
+16/15 ! ^D♭
+27/25 ! ^^D♭
+800/729 ! vvD
+10/9 ! vD
+9/8 ! D
+729/640 ! ^D
+59049/51200 ! ^^D
+75/64 ! vvD♯
+1215/1024 ! vD♯
+6/5 ! ^E♭
+243/200 ! ^^E♭
+100/81 ! vvE
+5/4 ! vE
+81/64 ! E
+6561/5120 ! ^E
+531441/409600 ! ^^E
+25600/19683 ! vvF
+320/243 ! vF
+4/3 ! F
+27/20 ! ^F
+2187/1600 ! ^^F
+25/18 ! vvF♯
+45/32 ! vF♯
+64/45 ! ^G♭
+36/25 ! ^^G♭
+3200/2187 ! vvG
+40/27! vG
+3/2 ! G
+243/160 ! ^G
+19683/12800 ! ^^G
+25/16 ! vvG♯
+405/256 ! vG♯
+8/5 ! ^A♭
+81/50 ! ^^A♭
+400/243 ! vvA
+5/3 ! vA
+27/16 ! A
+2187/1280 ! ^A
+177147/102400 ! ^^A
+225/128 ! vvA♯
+3645/2048 ! vA♯
+9/5 ! ^B♭
+729/400 ! ^^B♭
+50/27 ! vvB
+15/8 ! vB
+243/128 ! B
+19683/10240 ! ^B
+1594323/819200 ! ^^B
+12800/6561 ! vvC
+160/81 ! vC
+2/1 ! C
+!
+! @ABL NOTE_NAMES "C" "^C" "^^C" "vvC♯" "vC♯" "^D♭" "^^D♭" "vvD" "vD" "D" "^D" "^^D" "vvD♯" "vD♯" "^E♭" "^^E♭" "vvE" "vE" "E" "^E" "^^E" "vvF" "vF" "F" "^F" "^^F" "vvF♯" "vF♯" "^G♭" "^^G♭" "vvG" "vG" "G" "^G" "^^G" "vvG♯" "vG♯" "^A♭" "^^A♭" "vvA" "vA" "A" "^A" "^^A" "vvA♯" "vA♯" "^B♭" "^^B♭" "vvB" "vB" "B" "^B" "^^B" "vvC" "vC"
+! @ABL REFERENCE_PITCH 3 41 440.0
+! @ABL NOTE_RANGE_BY_INDEX 2 27 4 44
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/55-tertial-quintal-sabat-euler-lattice

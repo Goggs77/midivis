@@ -1,0 +1,20 @@
+! 7-EDO.ascl
+!
+7 equal divisions of an octave. 7 proportionally equal and equal sounding semitone intervals per octave.
+!
+! default tuning: degree 0 = 261.625565 Hz (12edo C tuning) *OR* degree 0 = 268.1830039 Hz (so that degree 5 = 440 Hz)
+!
+7
+!
+171.4285714 ! 1\7
+342.8571429 ! 2\7
+514.2857143 ! 3\7
+685.7142857 ! 4\7
+857.1428571 ! 5\7
+1028.571429 ! 6\7
+2/1 ! 0\7
+!
+! @ABL NOTE_NAMES "0\7 " "1\7 " "2\7 " "3\7 " "4\7 " "5\7 " "6\7 "
+! @ABL REFERENCE_PITCH 3 5 440.0
+! @ABL NOTE_RANGE_BY_INDEX -7 6 12 0
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/7-edo

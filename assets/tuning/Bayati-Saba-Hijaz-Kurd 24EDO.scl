@@ -1,0 +1,49 @@
+! Bayati-Saba-Hijaz-Kurd 24EDO.ascl
+!
+This 15-pitch set enables 24EDO versions of the maqamat Bayati, Saba, Hijaz, and Kurd on D, along with their typical modulations. An E1/2♭, F1/2♯, and B1/2♭ are added to the standard 12 pitches. Provided by Sami Abu Shumays. Visit the website to learn more.
+!
+! Jins modulations possible within this pitch set:
+! Hijaz D: D E♭ F♯ G (A)
+! Bayati D: D E1/2♭ F G (A)
+! Saba D (maqam and jins): D E1/2♭ F G♭ A B♭ C D♭ E♮ F
+! Kurd D: D E♭ F G (A)
+! Nahawand G: (F♯) G A B♭ C D
+! Nahawand Murassaa G: G A B♭ C D♭
+! Rast G: E♮ F1/2♯ G A B1/2♭ C D
+! Sikah B1/2♭: B1/2♭ C D E♭
+! Upper Rast D/G: D E F1/2♯ G
+! Nahawand D (for Rast, Nikriz, or Ajam G): D E♮ F♮ G
+! Nikriz G: G A B♭ C♯ D E♮ F♮
+! Ajam G: G A B♮ C D
+! (Maqam) Zanjaran D: D E♭ F♯ G A B♮ C D
+! Hijazkar D: B♭ C♯ D E♭ F♯
+! Hijaz Murassaa D: D E♭ F♯ G A♭
+!
+! References:
+! Inside Arabic Music, Chapter 11 (description of Tuning System); Ch 14-16 (descriptions of Ajnas); Ch 24 (Sayr diagrams)
+! http://maqamworld.com/en/index.php  * Maqam World Website, including Maqam and Jins Scales
+! https://www.youtube.com/user/abushumays * "Maqam Lessons" YouTube series, teaching the melodic vocabulary of the ajnas and maqamat
+!
+15
+!
+100.    ! E♭
+150.    ! E1/2♭ for Bayati & Saba D
+200.    ! E♮
+300.    ! F
+350.    ! F1/2♯ for Rast G
+400.    ! F♯
+500.    ! G
+600.    ! A♭
+700.    ! A
+800.    ! B♭
+850.    ! B1/2♭ for Rast G
+900.    ! B♮
+1000.   ! C
+1110.   ! C♯/D♭
+1200.
+!
+! @ABL NOTE_NAMES D E♭ E1/2♭ E♮ F F1/2♯ F♯ G A♭ A B♭ B1/2♭ B♮ C C♯/D♭
+! @ABL REFERENCE_PITCH 3 0 293.6648
+! @ABL NOTE_RANGE_BY_INDEX -2 13 7 5
+! @ABL SOURCE Inside Arabic Music, Chapter 11 (description of Tuning System); Ch 14-16 (descriptions of Ajnas); Ch 24 (Sayr diagrams)
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/bayati-saba-hijaz-kurd-24edo

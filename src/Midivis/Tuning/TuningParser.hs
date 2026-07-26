@@ -10,8 +10,9 @@ import Data.List.Extra ( trim )
 import Data.Ratio ( (%) )
 
 import Midivis.Util.THUtils
+import Midivis.Tuning.Scala
 import Language.Haskell.TH
-import Data.Char (toLower)
+import Data.Char (toLower, isUpperCase)
     
 --MIDI supports [0 127] note range. we fit each note periodically
 class Tuning a where
@@ -59,13 +60,6 @@ removeCommentsPreP scl =
         -- any integer will be seen as ratios
         --more on https://www.huygens-fokker.org/scala/scl_format.html, they even support parsing unit explicitly
 
-data Scala = Scala
-    {
-        name :: String, -- unset above
-        synopsis :: String,
-        count :: Integer,
-        pitches :: [Double]
-    }
 
 countChar :: Eq a => a -> [a] -> Int
 countChar x xs = length (filter (== x) xs)
@@ -87,7 +81,7 @@ parsePitch s =
                     q = read (drop 1 $ dropWhile (/='/') s') :: Double
                     in p/q
                 (1, 0) -> let
-                    cents = read s' :: Double
+                    cents = read (s'++"0") :: Double
                     in 2.0**(cents/1200.0)
                 _ -> error "Invalid pitch format in .scl"
                         
@@ -102,76 +96,42 @@ parseScala str =
         valid = fromIntegral cnt == length ps
     in
         if valid 
-            then Scala "" snps cnt (map parsePitch ps) 
+            then Scala "" c0 snps cnt (map parsePitch ps) 
             else error "Mismatch between declared note count and the actual line count in .scl"
 
 
 makeScala :: String -> Scala -> Q [Dec]
-makeScala name' (Scala _ syn cnt pit) = do
-    let firstLow (c:cs) = (toLower c) : cs
+makeScala name' (Scala _ low syn cnt pit) = do
+    let firstLow cs = map toLower (takeWhile isUpperCase cs) ++ (dropWhile isUpperCase cs)
         count = mkName "count"
         name = mkName "scl_name"
         newScl = mkName (firstLow name')
         pitches = mkName "pitches"
         scl = mkName "scl"
+        scl_lowest = mkName "scl_lowest"
         scl_count = mkName "scl_count"
         scl_pitches = mkName "scl_pitches"
         scl_synopsis = mkName "scl_synopsis"
         qName = qkExpToValD name (LitE (StringL name'))
+        qLowest = qkExpToValD scl_lowest (LitE (RationalL (toRational low)))
         qSyn = qkExpToValD scl_synopsis (LitE (StringL syn))
         qCount = qkExpToValD scl_count (LitE (IntegerL cnt))
         qPitches = qkListDouble scl_pitches (pit)
         qScl =
             ValD
-            (VarP newScl)
-            ( NormalB
-                ( AppE
-                    ( AppE
-                        (AppE (AppE (ConE 'Scala) (VarE name)) (VarE scl_synopsis))
-                        (VarE scl_count)
-                    )
-                    (VarE scl_pitches)
-                )
-            )
-            []
-    return [qName, qSyn, qCount, qPitches, qScl]
-
-
---deprecated
-makeTuning :: String -> Scala -> Q [Dec]
-makeTuning sclName (Scala _ syn cnt pit) = do
-    let newdata = mkName sclName
-        calibrate = mkName "calibrate"
-        calibrateA4 = mkName "calibrateA4"
-        calibrateC4 = mkName "calibrateC4"
-        --count = mkName "count"
-        f = mkName "f"
-        freq = mkName "freq"
-        fromIntegral = mkName "fromIntegral"
-        getFreq = mkName "getFreq"
-        getGeneralName = mkName "getGeneralName"
-        lowest = mkName "lowest"
-        lowestFreq = mkName "lowestFreq"
-        n = mkName "n"
-        newFreq = mkName "newFreq"
-        newlow = mkName "newlow"
-        noteID = mkName "noteID"
-        period = mkName "period"
-        --pitches = mkName "pitches"
-        prod = mkName "prod"
-        q = mkName "q"
-        quotRem = mkName "quotRem"
-        r = mkName "r"
-        scl_count = mkName "scl_count"
-        scl_pitches = mkName "scl_pitches"
-        show = mkName "show"
-        synopsis = mkName "synopsis"
-        --sorry about this
-        qSyn = qkExpToValD synopsis (LitE (StringL syn))
-        qCount = qkExpToValD scl_count (LitE (IntegerL cnt))
-        qPitches = qkListDouble scl_pitches (pit)
-        qData = DataD [] newdata [] Nothing [RecC newdata [(lowest,Bang NoSourceUnpackedness NoSourceStrictness,ConT ''Double)]] []
-        qInstance = InstanceD Nothing [] (AppT (ConT ''Tuning) (ConT newdata)) [FunD period [Clause [WildP] (NormalB (VarE scl_count)) []],FunD lowestFreq [Clause [ParensP (ConP newdata [] [VarP lowest])] (NormalB (VarE lowest)) []],FunD calibrate [Clause [ParensP (ConP newdata [] [WildP]),VarP noteID,VarP newFreq] (NormalB (AppE (ConE newdata) (VarE newlow))) [ValD (TupP [VarP q,VarP r]) (NormalB (UInfixE (AppE (VarE fromIntegral) (VarE noteID)) (VarE quotRem) (VarE scl_count))) [],ValD (VarP prod) (NormalB (CondE (UInfixE (VarE r) (VarE (mkName "/=")) (LitE (IntegerL 0))) (UInfixE (VarE scl_pitches) (VarE (mkName "!!")) (ParensE (UInfixE (AppE (VarE fromIntegral) (VarE r)) (VarE (mkName "-")) (LitE (IntegerL 1))))) (LitE (IntegerL 1)))) [],ValD (VarP newlow) (NormalB (UInfixE (VarE newFreq) (VarE (mkName "/")) (ParensE (UInfixE (VarE prod) (VarE (mkName "*")) (UInfixE (LitE (RationalL (2 % 1))) (VarE (mkName "**")) (AppE (VarE fromIntegral) (VarE q))))))) []]],FunD calibrateA4 [Clause [VarP n,VarP f] (NormalB (AppE (AppE (AppE (VarE calibrate) (VarE n)) (LitE (IntegerL 69))) (VarE f))) []],FunD calibrateC4 [Clause [VarP n,VarP f] (NormalB (AppE (AppE (AppE (VarE calibrate) (VarE n)) (LitE (IntegerL 60))) (VarE f))) []],FunD getFreq [Clause [ParensP (ConP newdata [] [VarP lowest]),VarP noteID] (NormalB (VarE freq)) [ValD (TupP [VarP q,VarP r]) (NormalB (UInfixE (AppE (VarE fromIntegral) (VarE noteID)) (VarE quotRem) (VarE scl_count))) [],ValD (VarP prod) (NormalB (CondE (UInfixE (VarE r) (VarE (mkName "/=")) (LitE (IntegerL 0))) (UInfixE (VarE scl_pitches) (VarE (mkName "!!")) (ParensE (UInfixE (AppE (VarE fromIntegral) (VarE r)) (VarE (mkName "-")) (LitE (IntegerL 1))))) (LitE (IntegerL 1)))) [],ValD (VarP freq) (NormalB (UInfixE (VarE lowest) (VarE (mkName "*")) (ParensE (UInfixE (VarE prod) (VarE (mkName "*")) (UInfixE (LitE (RationalL (2 % 1))) (VarE (mkName "**")) (AppE (VarE fromIntegral) (VarE q))))))) []]],FunD getGeneralName [Clause [WildP,VarP noteID] (NormalB (LetE [ValD (TupP [VarP q,VarP r]) (NormalB (UInfixE (AppE (VarE fromIntegral) (VarE noteID)) (VarE quotRem) (AppE (VarE fromIntegral) (VarE scl_count)))) []] (UInfixE (AppE (VarE show) (VarE r)) (VarE (mkName "++")) (UInfixE (LitE (StringL "/")) (VarE (mkName "++")) (AppE (VarE show) (VarE q)))))) []]]
-    return [qSyn, qCount, qPitches, qData, qInstance]
-
-
+              (VarP newScl)
+              ( NormalB
+                  ( AppE
+                      ( AppE
+                          ( AppE
+                              (AppE (AppE (ConE 'Scala) (VarE name)) (VarE scl_lowest))
+                              (VarE scl_synopsis)
+                          )
+                          (VarE scl_count)
+                      )
+                      (VarE scl_pitches)
+                  )
+              )
+              --where
+              [qName, qLowest, qSyn, qCount, qPitches]
+    return [qScl]

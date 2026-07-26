@@ -1,0 +1,18 @@
+! 5-EDO.ascl
+!
+5 equal divisions of an octave. 5 proportionally equal and equal sounding semitone intervals per octave.
+!
+! default tuning: degree 0 = 261.625565 Hz (12edo C tuning) *OR* degree 0 = 252.7136381 Hz (so that degree 4 = 440 Hz)
+!
+5
+!
+240.0 ! 1\5
+480.0 ! 2\5
+720.0 ! 3\5
+960.0 ! 4\5
+2/1 ! 0\5
+!
+! @ABL NOTE_NAMES "0\5 " "1\5 " "2\5 " "3\5 " "4\5 "
+! @ABL REFERENCE_PITCH 3 4 440.0
+! @ABL NOTE_RANGE_BY_INDEX -10 0 15 2
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/5-edo
