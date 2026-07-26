@@ -8,6 +8,7 @@ import Midivis.Tuning.Scala
 import Midivis.Midi.MidiParser
 import Midivis.Util.Math
 import Midivis.World
+import Midivis.Midi.MidiEventType (MidiEventType(..))
 
 
 rgba :: Float -> Float -> Float -> Float -> Color
@@ -35,8 +36,8 @@ drawRelativeFrame w0 = do
 mapToRadii :: World -> Color -> Frame
 mapToRadii w0 clr = 
     let evts = unpack $ midiEvtBuf w0
-        freqs = toList $ V.map (getFreq (sclOfChoice w0)) (V.map (\e -> valueL e) evts)
-        names = map (getGeneralName (sclOfChoice w0)) (map (\e -> valueL e) (toList evts))
+        freqs = toList $ V.map (getFreq (sclOfChoice w0)) (V.map (\e -> valueL e) (V.filter (\e -> evt e == NoteOn) evts))
+        names = map (getGeneralName (sclOfChoice w0)) (map (\e -> valueL e) (toList (V.filter (\e -> evt e == NoteOn) evts)))
         phaseDiff = 2*pi/fromIntegral (length freqs)
         angles = take (length freqs) (iterate (+phaseDiff) (baseAngle w0))
         -- zip for processing
@@ -48,9 +49,10 @@ mapToRadii w0 clr =
 customRadius :: Color -> Double -> Double -> String -> Frame
 customRadius clr angle radius na  =
     zoom (Relative 0.05) (Relative 0.05) (alignAt p2) (banner na clr) <>
+    aspect (1,1) alignCenter (zoom (Relative 0.1) (Relative 0.1) (alignAt p2) (solidEllipse (0.2 `withAlpha` clr))) <>
     stroke [
         (Relative 0, Relative 0), 
-        p2
+        p2 .* 0.86
     ] clr
     where p2 = (Relative $ realToFrac.(0.5*radius*).cos $ angle, Relative $ realToFrac.(0.5*radius*).sin $ angle)
     
