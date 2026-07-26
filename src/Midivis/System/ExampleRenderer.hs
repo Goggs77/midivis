@@ -7,23 +7,28 @@ import Midivis.Util.Math
 
 import Graphics.Gloss.Relative
 import Sound.RtMidi (InputDevice)
+import Control.Concurrent.STM
 
 
 
-drawExampleRelative :: World -> IO ()
-drawExampleRelative w0 = do
+drawExampleRelative :: TVar World -> IO ()
+drawExampleRelative w0TVar = do
     inputDevice <- initMidi
+    w0 <- atomically $ readTVar w0TVar
     putStrLn "[Debug] Midi Initialized"
     playRelativeIO
-        (InWindow "Example Relative Window" (1151,809) (100,100))
+        (InWindow "Midivis" (1151,809) (100,100))
         black
         1000 -- poll per 1 ms (1KHz)
         w0
         drawRelativeFrame
         handleEvent
-        (step inputDevice)
+        (step w0TVar inputDevice)
 
-
+writeWorld :: TVar World -> World -> IO World
+writeWorld w0TVar w0 = do
+    _ <- atomically $ writeTVar w0TVar w0 -- discard return STM ()
+    return w0
 
 stepTime :: Float -> World -> IO World
 stepTime dT w0 = return w0{
@@ -40,9 +45,11 @@ stepAngle w0 = if isFixedFrame w0 then return w0{
     } 
     else return w0
 
-step :: InputDevice -> Float -> World -> IO World
-step inputDevice dT w0 = do
+step :: TVar World -> InputDevice -> Float -> World -> IO World
+step w0TVar inputDevice dT w0 = do
     stepTime dT w0
     >>= stepAngle
     >>= bufferMidi inputDevice
     >>= cleanBuffer 
+    >>= writeWorld w0TVar
+-- This flow of world demonstrates "Functions are poor men's Object"

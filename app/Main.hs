@@ -2,10 +2,12 @@ module Main where
 
 import Midivis.World
 import Midivis.System.ExampleRenderer 
+import Control.Concurrent.STM
 
 main :: IO ()
 main = do
-    let w0 = initWorld
-    drawExampleRelative w0
+    -- now supports multi threads with World access, need to add audio thread
+    w0TVar <- newTVarIO initWorld
+    drawExampleRelative w0TVar
 
 
