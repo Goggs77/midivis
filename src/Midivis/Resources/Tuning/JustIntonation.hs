@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 module Midivis.Resources.Tuning.JustIntonation where
 import Data.FileEmbed
 import Midivis.Tuning.TuningParser

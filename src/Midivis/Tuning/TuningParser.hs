@@ -7,7 +7,6 @@ import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8')
 import Data.List.Extra ( trim )
-import Data.Ratio ( (%) )
 
 import Midivis.Util.THUtils
 import Midivis.Tuning.Scala

@@ -16,8 +16,6 @@ rgba = makeColor
 rgbaI :: Int -> Int -> Int -> Int -> Color
 rgbaI = makeColorI
 
-drawExampleText :: Picture
-drawExampleText =  (scale 0.1 0.1 . color white) (Text "This is an example window")
 
 -- w0 contains datas for rendering: sclOfChoice and baseAngle, the latter of which is updated on step
 drawRelativeFrame :: World -> IO Frame
@@ -41,7 +39,7 @@ mapToRadii w0 clr =
         phaseDiff = 2*pi/fromIntegral (length freqs)
         angles = take (length freqs) (iterate (+phaseDiff) (baseAngle w0))
         -- zip for processing
-        zipped = zip3 angles (scaleNumLog (c0) (20000) 0.0 1 freqs) names 
+        zipped = zip3 angles (scaleNumLog (c0) (20000) 0 1 freqs) names 
     in Overlay $ map (uncurry3 (customRadius clr)) zipped
 
 
