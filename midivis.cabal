@@ -67,23 +67,23 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  Midivis.World,
-                      Midivis.Render.Example,
-                      Midivis.System.ExampleRenderer,
-                      Midivis.System.MidiQuery,
-                      Midivis.EventHandler,
-                      Midivis.Midi.MidiParser,
-                      Midivis.Midi.MidiEventType,
-                      Midivis.Tuning.TuningParser,
-                      Midivis.Tuning.Scala,
-                      Midivis.Resources.Tuning.All,
-                      Midivis.Util.THUtils
+    exposed-modules:    Midivis.World,
+                        Midivis.Render.Example,
+                        Midivis.System.ExampleRenderer,
+                        Midivis.System.MidiQuery,
+                        Midivis.EventHandler,
+                        Midivis.Midi.MidiParser,
+                        Midivis.Midi.MidiEventType,
+                        Midivis.Tuning.TuningParser,
+                        Midivis.Tuning.Scala,
+                        Midivis.Resources.Tuning.All,
 
     -- sorry but keep it ascii
     other-modules:      Midivis.Resources.Tuning.Default,
                         Midivis.Resources.Tuning.EDO,
                         Midivis.Resources.Tuning.JustIntonation,
-                        Midivis.Resources.Tuning.Dastgah 
+                        Midivis.Resources.Tuning.Dastgah,
+                        Midivis.Util.THUtils
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
