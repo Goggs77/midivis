@@ -1,7 +1,22 @@
-module Midivis.World(World(..), MidiEventBuffer, pack, unpack, initWorld, isFixedFrame, midiLength) where
+{-# OPTIONS_GHC -Wno-missing-fields #-}
+module Midivis.World(World(..)
+    , MidiEventBuffer
+    , pack
+    , unpack
+    , initWorld
+    , readWorld
+    , readWorld'
+    , writeWorld
+    , writeWorld'
+    , isFixedFrame
+    , midiLength) where
 
 import qualified Data.Vector.Storable as V
 import Data.Vector.Storable
+import qualified Data.StorableVector.Base as SVB
+import qualified Data.StorableVector as SV
+import Control.Concurrent.STM
+import Control.Concurrent.STM.TQueue
 
 import Midivis.Midi.MidiParser (MidiEvent)
 import Midivis.Resources.Tuning.All
@@ -14,27 +29,63 @@ instance Monoid MidiEventBuffer where mempty = MidiEventBuffer( V.fromList [] )
 
 data World =  World 
     {
+        -- timing
         time :: Float,
+        -- gui stuff
         fixedFrameRate :: Integer,
         fixedFrameCounter :: Float,
-        clockVelocity :: Double,
+        baseAngle :: Double,
+        clockVelocity :: Double, 
         bufferVelocity :: Double,
+        -- midi and tuning
         midiEvtBuf :: MidiEventBuffer,
-        sclOfChoice :: Scala,
-        baseAngle :: Double
+        midiEvtCpy :: SV.Vector MidiEvent,
+        midiEvtQue :: !(TQueue (SV.Vector MidiEvent)),
+        sclOfChoice :: Scala
+    
     }
 
-initWorld :: World
-initWorld = World {
+initWorld :: TQueue (SVB.Vector MidiEvent) -> World
+initWorld tq = World {
+    -- timing
     time = 0.0, 
+    -- gui stuff
     fixedFrameRate = 144, 
     fixedFrameCounter = 0.0, 
+    baseAngle = 0.0, 
     clockVelocity = pi / 288 / 1.5,
     bufferVelocity = 0,
+    -- midi and tuning
     midiEvtBuf = mempty, 
-    baseAngle = 0.0, 
+      --midiEvtCpy = , just leave it, we'll update it once we have updated midi thread
+    midiEvtQue = tq,
     sclOfChoice = edo12
     }
+
+-- | Writes the World atomically
+writeWorld :: TVar World -> World -> IO ()
+writeWorld w0TVar w0 = do
+    _ <- atomically $ writeTVar w0TVar w0 -- discard return STM ()
+    return ()
+
+-- | Writes the World atomically and return input, used with >>= chains
+writeWorld' :: TVar World -> World -> IO World
+writeWorld' w0TVar w0 = do
+    _ <- atomically $ writeTVar w0TVar w0 -- discard return STM ()
+    return w0
+
+-- | Reads the World atomically and returns it
+readWorld :: TVar World -> IO World
+readWorld w0TVar = do
+    w1 <- readTVarIO w0TVar
+    return w1
+
+-- | Reads the World atomically and returns it, used with >>= chains
+readWorld' :: TVar World -> World -> IO World
+readWorld' w0TVar _ = do
+    w1 <- readTVarIO w0TVar
+    return w1
+
 
 isFixedFrame :: World -> Bool
 isFixedFrame w0 = fixedFrameCounter w0 == 0

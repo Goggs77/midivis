@@ -83,6 +83,9 @@ library
                         Midivis.Resources.Tuning.EDO,
                         Midivis.Resources.Tuning.JustIntonation,
                         Midivis.Resources.Tuning.Dastgah,
+                        Midivis.Synth.Types,
+                        Midivis.Synth.Osc,
+                        Midivis.Synth.Engine,
                         Midivis.Util.THUtils,
                         Midivis.Util.Math
 
@@ -108,10 +111,12 @@ library
                       -- audio processing
                       RtMidi,
                       storablevector, 
-                      bindings-portaudio,
+                      portaudio,
+                      -- synthesizer for microtuning examples
                       synthesizer-core,
+                      synthesizer-midi,
                       -- concurrent needs
-                      stm
+                      stm^>=2.5.3.1
 
 
     -- Directories containing source files.
@@ -138,6 +143,7 @@ executable midivis
                       base ^>=4.20.1.0,
                       midivis,
                       RtMidi,
+                      portaudio,
                       stm ^>=2.5.3.1,
 
     -- Directories containing source files.

@@ -39,7 +39,7 @@ mapToRadii w0 clr =
         phaseDiff = 2*pi/fromIntegral (length freqs)
         angles = take (length freqs) (iterate (+phaseDiff) (baseAngle w0))
         -- zip for processing
-        zipped = zip3 angles (scaleNumLog (c0) (20000) 0 1 freqs) names 
+        zipped = zip3 angles (scaleNumLog2 (c0) (20000) 0 1 freqs) names 
     in Overlay $ map (uncurry3 (customRadius clr)) zipped
 
 

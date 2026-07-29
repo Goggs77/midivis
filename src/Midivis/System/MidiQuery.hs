@@ -4,6 +4,7 @@ module Midivis.System.MidiQuery where
 
 import qualified Data.Vector.Storable as V
 import Data.Vector.Storable (Vector)
+import qualified Data.StorableVector.Base as SV
 import qualified Data.HashSet as H
 import Data.Hashable
 import qualified Data.Vector.Algorithms.Intro as Intro
@@ -13,6 +14,7 @@ import Sound.RtMidi
 import Midivis.Midi.MidiParser
 import Midivis.Midi.MidiEventType
 import Midivis.World
+import Control.Concurrent.STM (writeTQueue, atomically)
 
 
 -- Helpers to manipulate the global MidiEventBuffer
@@ -60,15 +62,26 @@ cleanBuffer w0 = do
         noteOffs = sortBy valueL $ V.filter (\e -> evt e == NoteOff) buf
         notePpA  = V.filter (\e -> evt e == PolyphonicAftertouch) buf
         notePB   = V.filter (\e -> evt e == PitchBendChange) buf
-        processedOns = filterSortedByKey valueL noteOffs noteOns
-        processedPpA = takeSameIdWith valueL processedOns notePpA
-        processedPB  = takeSameIdWith valueL processedOns notePB
-    if (V.length noteOns >= V.length noteOffs) 
-        then
-            return w0{midiEvtBuf = pack $  (processedOns V.++ processedPpA V.++ processedPB)} 
-        -- all NoteOffs must be eliminated, so no need to process, as the error below
-        else error "Note On/Off mismatch" 
+    -- quick sanity check: avoid expensive processing when counts mismatch
+    if V.length noteOns < V.length noteOffs
+        then error "Note On/Off mismatch" 
         --Known error that this is triggered when using Shift+Control on MiniLab 3
+        else do
+            let processedOns = filterSortedByKey valueL noteOffs noteOns
+                processedPpA = takeSameIdWith valueL processedOns notePpA
+                processedPB  = takeSameIdWith valueL processedOns notePB
+                processedAll = V.force $ processedOns V.++ processedPpA V.++ processedPB
+                sv = copyElements processedAll
+            sv `seq` atomically $ writeTQueue (midiEvtQue w0) sv
+            return w0{
+                midiEvtBuf = pack $ processedAll,
+                midiEvtCpy = sv
+            }
+        
+
+copyElements :: (V.Storable a ) => V.Vector a -> SV.Vector a
+copyElements buf = SV.SV fp offset len where
+            (fp, offset, len) = V.unsafeToForeignPtr buf
 
 -- | Removes ys' elements that has the same extractKey in xs, better when unsorted
 dropSameIdWith :: (Hashable k, Eq k, V.Storable a, V.Storable k) => (a -> k) -> Vector a -> Vector a -> Vector a
@@ -85,7 +98,7 @@ takeSameIdWith extractKey xs ys =
 sortBy :: (V.Storable a, Ord b) => (a -> b) -> Vector a -> Vector a
 sortBy extractKey = V.modify (Intro.sortBy (compare `on` extractKey))
 
--- | (Only when sorted in ascent order) Removes ys' elements that has the same key in xs
+-- | (Only when sorted in ascent order) ys \ xs => Removes ys' elements that has the same key in xs
 filterSortedByKey ::(V.Storable a) => (a -> Int) -> Vector a -> Vector a -> Vector a
 filterSortedByKey extractKey xs ys = V.unfoldr step (0, 0)
   where
