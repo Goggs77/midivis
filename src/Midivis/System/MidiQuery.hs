@@ -15,6 +15,7 @@ import Midivis.Midi.MidiParser
 import Midivis.Midi.MidiEventType
 import Midivis.World
 import Control.Concurrent.STM (writeTQueue, atomically)
+import System.IO (hPutStrLn, stderr)
 
 
 -- Helpers to manipulate the global MidiEventBuffer
@@ -29,9 +30,6 @@ getMidiBuffer w0 = midiEvtBuf w0
 
 clearMidiBuffer :: World -> IO World
 clearMidiBuffer w0 = return w0 {midiEvtBuf = mempty}
-
-forever :: Monad m => m a -> m b
-forever a = a >> forever a
 
 
 -- | Initialize midi, don't block thread
@@ -62,10 +60,11 @@ cleanBuffer w0 = do
         noteOffs = sortBy valueL $ V.filter (\e -> evt e == NoteOff) buf
         notePpA  = V.filter (\e -> evt e == PolyphonicAftertouch) buf
         notePB   = V.filter (\e -> evt e == PitchBendChange) buf
-    -- quick sanity check: avoid expensive processing when counts mismatch
+    -- MiniLab 3's Shift+Control triggers this benignly; just skip the frame
     if V.length noteOns < V.length noteOffs
-        then error "Note On/Off mismatch" 
-        --Known error that this is triggered when using Shift+Control on MiniLab 3
+        then do
+            hPutStrLn stderr "[Midi] Warning: discarding unbalanced frame (NoteOn < NoteOff)"
+            return w0{midiEvtBuf = mempty}
         else do
             let processedOns = filterSortedByKey valueL noteOffs noteOns
                 processedPpA = takeSameIdWith valueL processedOns notePpA

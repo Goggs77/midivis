@@ -1,6 +1,5 @@
 module Midivis.Synth.Osc where
 
-import qualified Data.StorableVector.Base as SV
 import qualified Synthesizer.Storable.Oscillator as O
 import qualified Synthesizer.Basic.Phase as P
 import qualified Synthesizer.Basic.Wave as W

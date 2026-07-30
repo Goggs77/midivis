@@ -1,3 +1,4 @@
 packages: .
           ./rtmidifix/RtMidi-0.8.0.0
+          ./rtmidifix/portaudio-0.2.4
           ./newerGlossRelative/gloss-relative

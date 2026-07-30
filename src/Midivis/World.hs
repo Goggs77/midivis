@@ -59,7 +59,7 @@ initWorld tq = World {
     midiEvtBuf = mempty, 
       --midiEvtCpy = , just leave it, we'll update it once we have updated midi thread
     midiEvtQue = tq,
-    sclOfChoice = edo12
+    sclOfChoice = fiveSeven
     }
 
 -- | Writes the World atomically

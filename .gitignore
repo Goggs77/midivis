@@ -58,6 +58,7 @@ newerGlossRelative/
 rtmidifix/
 freeglut/
 drafts/
+.workbuddy/
 
 # Generated project files
 dist-newstyle/

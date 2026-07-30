@@ -76,18 +76,21 @@ library
                         Midivis.Midi.MidiEventType,
                         Midivis.Tuning.TuningParser,
                         Midivis.Tuning.Scala,
-                        Midivis.Resources.Tuning.All
+                        Midivis.Resources.Tuning.All,
+                        Midivis.Synth.Engine,
+                        Midivis.Synth.Types,
+                        Midivis.Synth.Buffer,
+                        Midivis.Synth.Osc,
+                        Midivis.Synth.Render
 
     -- sorry but keep it ascii
     other-modules:      Midivis.Resources.Tuning.Default,
                         Midivis.Resources.Tuning.EDO,
                         Midivis.Resources.Tuning.JustIntonation,
                         Midivis.Resources.Tuning.Dastgah,
-                        Midivis.Synth.Types,
-                        Midivis.Synth.Osc,
-                        Midivis.Synth.Engine,
                         Midivis.Util.THUtils,
-                        Midivis.Util.Math
+                        Midivis.Util.Math,
+                        Midivis.Synth.VoicePool
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -145,6 +148,7 @@ executable midivis
                       RtMidi,
                       portaudio,
                       stm ^>=2.5.3.1,
+                      storablevector
 
     -- Directories containing source files.
     hs-source-dirs:   app
