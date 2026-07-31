@@ -184,12 +184,13 @@ defConvIRT60 :: Double
 defConvIRT60 = 1.8                   -- seconds
 
 -- | Partition (block) size for the uniform partitioned convolution.
---   Must be a power of two; latency = block / sampleRate (~21 ms @ 96 kHz).
+--   Must be a power of two; latency = block / sampleRate (~11 ms @ 96 kHz).
 --   Note: total multiply-accumulate load = 2·IR·sr/N, so small blocks (e.g.
 --   512) are ~4x heavier than 2048 and exceed the real-time budget in pure
---   Haskell, causing audio dropouts.
+--   Haskell, causing audio dropouts.  1024 with fpb=1024 keeps the per-block
+--   burst (2.5-5.5ms) well inside the 10.7ms callback budget.
 defConvBlockSize :: Int
-defConvBlockSize = 2048
+defConvBlockSize = 1024
 
 -- | Truncate the IR to this many seconds before convolving.  The reverb tail
 --   beyond this is discarded, cutting the per-block multiply-accumulate work

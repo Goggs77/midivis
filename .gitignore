@@ -54,8 +54,6 @@ cabal.sandbox.config
 *.zip
 *.7z
 *.tar.gz
-newerGlossRelative/
-rtmidifix/
 freeglut/
 drafts/
 .workbuddy/

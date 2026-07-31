@@ -36,7 +36,7 @@ main = do
     -- === 1. Create shared state ===
     midiTQue <- newTQueueIO
     w0TVar <- newTVarIO $ initWorld midiTQue
-    let fpb = 512
+    let fpb = 2048
         nch = 2
         sr  = defSampleRate
     ir' <- ir

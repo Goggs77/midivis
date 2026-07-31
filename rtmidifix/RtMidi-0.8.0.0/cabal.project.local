@@ -1,0 +1,8 @@
+ignore-project: False
+with-compiler: ghc-9.10.3
+tests: False
+benchmarks: False
+optimization: False
+
+program-options
+  ghc-options: +RTS -M256m -A32m -RTS
