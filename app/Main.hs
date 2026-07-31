@@ -27,7 +27,7 @@ main = do
     -- === 1. Create shared state ===
     midiTQue <- newTQueueIO
     w0TVar <- newTVarIO $ initWorld midiTQue
-    let fpb = 64
+    let fpb = 256
         nch = 2
         sr  = defSampleRate
 
@@ -81,7 +81,7 @@ main = do
                 Right devIdx -> do
                     hPutStrLn stderr $ "[Audio] Using device " ++ show devIdx
                     let outParams = Just (StreamParameters (fromIntegral devIdx) (fromIntegral nch) (Base.PaTime 0.1))
-                    phVar <- newIORef (0.0 :: Double)
+                    phVar <- newIORef (1.0 :: Double)
 
                     let callback :: StreamCallback CFloat CFloat
                         callback _time _flags nFrames _inp outPtr = do
