@@ -18,6 +18,7 @@ import Midivis.Synth.Types
 import Midivis.Synth.ConvReverb (ConvReverb, processReverb)
 import Midivis.Util.Math
 import Data.Bits (shiftR, (.&.))
+import System.Random (randomRIO)
 
 
 -- | Deterministic smooth-random LFO value in [-1, 1] at absolute sample
@@ -93,13 +94,15 @@ renderCallback vp sr nFrames outPtr gainRef reverbRef smpRef ampSmoothRef ampMid
                 when audible $ do
                     let !delta = (s2' - s2) / fromIntegral nFrames
                     forM_ [0 .. n - 1] (\f -> do
+                        noise <- randomRIO (-0.01, 0.01)
                         let !sf = fromIntegral f :: Double
                             !af = s2 + delta * fromIntegral (f + 1)
                             !an = af * defNormalizeAmp
                             !s  = realToFrac ((tanh) ( --with spectral amp adjustments
-                                m1 * sin (2 * pi * (ph + sf * step)) * 0.8  * (-0.22 * (log10 freq) + 1.2)
+                                m1 * sin (2 * pi * (ph + sf * step)) * 0.8  * (-0.22 * (log10 freq) + 1.2) +
                                 m2 * sin (4 * pi * (ph + sf * step)) * 0.2 * an * (-0.14 * (log10 freq) + 1.14) +
-                                m3 * sin (6 * pi * (ph + sf * step)) * 0.514 * an * an
+                                m3 * sin (6 * pi * (ph + sf * step)) * 0.514 * an * an +
+                                m1 * m2 * m3 * noise
                                 ) * an) :: CFloat
                         curL <- peekElemOff outPtr (f * 2)
                         pokeElemOff outPtr (f * 2)     (curL + s)
@@ -179,8 +182,7 @@ renderCallback vp sr nFrames outPtr gainRef reverbRef smpRef ampSmoothRef ampMid
 compressBuffer :: Ptr CFloat -> Int -> Double -> IORef Double -> IO ()
 compressBuffer outPtr totalSamples sr gainRef = do
     g <- readIORef gainRef
-    let preAmp = 1 + fromDBFS (-9.0)
-        thr    = fromDBFS (-6.0)
+    let thr    = fromDBFS (-6.0)
         ratio  = 100.0
         aAtk   = 1.0 - exp (-1.0 / (0.001 * sr))    -- 1 ms attack
         aRel   = 1.0 - exp (-1.0 / (0.325 * sr))    -- 325 ms release
@@ -189,7 +191,7 @@ compressBuffer outPtr totalSamples sr gainRef = do
             | otherwise = do
                 xL <- peekElemOff outPtr i
                 xR <- peekElemOff outPtr (i + 1)
-                let env = max (abs (realToFrac xL*preAmp)) (abs (realToFrac xR*preAmp)) :: Double
+                let env = max (abs (realToFrac xL)) (abs (realToFrac xR)) :: Double
                     targetGain
                         | env > thr  = (thr + (env - thr) / ratio) / env
                         | otherwise  = 1.0

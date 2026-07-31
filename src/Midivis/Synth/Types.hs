@@ -256,7 +256,7 @@ defAmpSmoothK :: Double
 defAmpSmoothK = 0.01
 
 defAttack :: EnvelopeState
-defAttack = Attack 0.1 0.3    -- curve -> 0 for "instant" on (10th root of x)
+defAttack = Attack 1.3 0.3    -- curve -> 0 for "instant" on (10th root of x)
 
 defDecay :: EnvelopeState
 defDecay = Decay 0.9 0.6
@@ -271,4 +271,4 @@ defSustain :: EnvelopeState
 defSustain = Sustain defSustainLevel
 
 defRelease :: EnvelopeState
-defRelease = Release 0.1 0.1
+defRelease = Release 0.2 0.15
