@@ -8,6 +8,9 @@ import Midivis.Util.Math
 import Graphics.Gloss.Relative
 import Sound.RtMidi (InputDevice)
 import Control.Concurrent.STM
+import Midivis.Tuning.Scala
+import Midivis.Resources.Tuning.All
+
 
 
 
@@ -25,14 +28,16 @@ drawExampleRelative w0TVar = do
         handleEvent
         (step w0TVar inputDevice)
 
--- | Time management
+-- | Time management and modulation update
 stepTime :: Float -> World -> IO World
-stepTime dT w0 = return w0{
-    time = time w0 + dT, 
-    fixedFrameCounter = if fixedFrameCounter w0 >= 1.0 / fromIntegral (fixedFrameRate w0) 
-        then 0 
-        else fixedFrameCounter w0 + dT
-    }
+stepTime dT w0 = 
+    return w0{
+        time = time w0 + dT, 
+        totalFrames = totalFrames w0 + 1,
+        fixedFrameCounter = if fixedFrameCounter w0 >= 1.0 / fromIntegral (fixedFrameRate w0) 
+            then 0 
+            else fixedFrameCounter w0 + dT
+        }
 
 stepAngle :: World -> IO World
 stepAngle w0 = if isFixedFrame w0 then return w0{
@@ -41,10 +46,25 @@ stepAngle w0 = if isFixedFrame w0 then return w0{
     } 
     else return w0
 
+stepTuning :: World -> IO World
+stepTuning w0 = if totalFrames w0 `rem` 90 == 0 && tuningScroll w0 /= Stop
+    then do 
+        let i = case (tuningScroll w0) of
+                Next -> 1
+                Stop -> 0
+                Prev -> (-1)
+            newIndex = (sclIndex w0 + (length allTunings + i)) `rem` (length allTunings)
+        return w0 {
+        sclIndex = newIndex,
+        sclOfChoice = calibrateA4 (allTunings !! newIndex) (freqA4 w0)
+        }
+    else return w0
+
 step :: TVar World -> InputDevice -> Float -> World -> IO World
 step w0TVar inputDevice dT w0 = do
     stepTime dT w0
     >>= stepAngle
+    >>= stepTuning
     >>= bufferMidi inputDevice
     >>= cleanBuffer 
     >>= writeWorld' w0TVar -- actually updates it, not overwrites it

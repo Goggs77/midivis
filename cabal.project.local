@@ -4,4 +4,4 @@ benchmarks: False
 optimization: True
 
 program-options
-  ghc-options: +RTS -N -RTS
+  ghc-options: +RTS -N -M2G -RTS

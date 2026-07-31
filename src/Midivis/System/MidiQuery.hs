@@ -56,26 +56,37 @@ bufferMidi inputDevice w0 = do
 cleanBuffer :: World -> IO World
 cleanBuffer w0 = do
     let buf = (unpack $ midiEvtBuf w0)
-        noteOns  = sortBy valueL $ V.filter (\e -> evt e == NoteOn) buf
-        noteOffs = sortBy valueL $ V.filter (\e -> evt e == NoteOff) buf
-        notePpA  = V.filter (\e -> evt e == PolyphonicAftertouch) buf
-        notePB   = V.filter (\e -> evt e == PitchBendChange) buf
-    -- MiniLab 3's Shift+Control triggers this benignly; just skip the frame
-    if V.length noteOns < V.length noteOffs
-        then do
-            hPutStrLn stderr "[Midi] Warning: discarding unbalanced frame (NoteOn < NoteOff)"
-            return w0{midiEvtBuf = mempty}
+    -- Idle fast path: no events at all — skip the whole pipeline
+    -- (sorting / hashing / V.force / writeTQueue) which would otherwise
+    -- allocate ~300B per frame at 1000 Hz even when nothing is happening.
+    if V.null buf
+        then return w0
         else do
-            let processedOns = filterSortedByKey valueL noteOffs noteOns
-                processedPpA = takeSameIdWith valueL processedOns notePpA
-                processedPB  = takeSameIdWith valueL processedOns notePB
-                processedAll = V.force $ processedOns V.++ processedPpA V.++ processedPB
-                sv = copyElements processedAll
-            sv `seq` atomically $ writeTQueue (midiEvtQue w0) sv
-            return w0{
-                midiEvtBuf = pack $ processedAll,
-                midiEvtCpy = sv
-            }
+            let noteOns  = sortBy valueL $ V.filter (\e -> evt e == NoteOn) buf
+                noteOffs = sortBy valueL $ V.filter (\e -> evt e == NoteOff) buf
+                notePpA  = V.filter (\e -> evt e == PolyphonicAftertouch) buf
+                notePB   = V.filter (\e -> evt e == PitchBendChange) buf
+            -- MiniLab 3's Shift+Control triggers this benignly; just skip the frame
+            if V.length noteOns < V.length noteOffs
+                then do
+                    hPutStrLn stderr "[Midi] Warning: discarding unbalanced frame (NoteOn < NoteOff)"
+                    return w0{midiEvtBuf = mempty}
+                else do
+                    let processedOns = filterSortedByKey valueL noteOffs noteOns
+                        processedPpA = takeSameIdWith valueL processedOns notePpA
+                        processedPB  = takeSameIdWith valueL processedOns notePB
+                        processedAll = V.force $ processedOns V.++ processedPpA V.++ processedPB
+                        sv = copyElements processedAll
+                    sv `seq` atomically $ writeTQueue (midiEvtQue w0) sv
+                    -- Keep only the active NoteOns in the buffer for the next
+                    -- frame's held-note matching.  Aftertouch/PB are consumed
+                    -- here (sent to the queue) and dropped — otherwise they
+                    -- would accumulate forever while a key is held, growing
+                    -- the per-frame work linearly and causing audio dropouts.
+                    return w0{
+                        midiEvtBuf = pack $ processedOns,
+                        midiEvtCpy = sv
+                    }
         
 
 copyElements :: (V.Storable a ) => V.Vector a -> SV.Vector a

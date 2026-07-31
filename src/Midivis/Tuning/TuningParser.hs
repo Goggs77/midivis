@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unused-local-binds #-}
-module Midivis.Tuning.TuningParser(Tuning(..), Scala(..), parseScala, makeScala) where
+module Midivis.Tuning.TuningParser(Scala(..), parseScala, makeScala) where
 import qualified Data.ByteString as BS
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8')
@@ -14,14 +14,7 @@ import Language.Haskell.TH
 import Data.Char (toLower, isUpperCase)
     
 --MIDI supports [0 127] note range. we fit each note periodically
-class Tuning a where
-    period :: a -> Integer
-    lowestFreq :: a -> Double --unset in .scl file
-    calibrate :: Integral b => a -> b -> Double -> a
-    calibrateA4 :: a -> Double -> a
-    calibrateC4 :: a -> Double -> a
-    getFreq :: Integral b => a -> b -> Double
-    getGeneralName :: Integral b => a -> b -> String
+
 
 
 

@@ -21,14 +21,19 @@ rgbaI = makeColorI
 drawRelativeFrame :: World -> IO Frame
 drawRelativeFrame w0 = do 
     let centerFrame = Aspect (1,1) alignCenter .
-            zoom (Relative 0.73) (Relative 0.73) alignCenter
+            zoom (Relative 0.73) (Relative 0.73) alignCenter . debugAddBorder
+        bottomFrame = Aspect (1, 0.73) alignBottom . debugAddBorder .
+            zoom (Relative 0.73) (Relative 0.135) (alignAt (Relative 0, Relative (-1))) . debugAddBorder .
+            zoom (Relative 1) (Relative 0.333) alignCenter
     let centerPoint = centerFrame $
             solidEllipse (rgba 1 1 1 0.05)
         movingLine = centerFrame $
             mapToRadii w0 (rgba 1 1 1 0.95)
         middleCircle = centerFrame $
             thickEllipse (rgba 1 1 1 0.8) (Absolute 2.0)
-    return $ Overlay [movingLine, centerPoint, middleCircle]
+        bottomText = bottomFrame $
+            banner (name $ sclOfChoice w0) (rgba 1 1 1 0.95)
+    return $ Overlay [movingLine, centerPoint, middleCircle, bottomText]
 
 -- pl(radius) = radii
 mapToRadii :: World -> Color -> Frame
@@ -60,4 +65,5 @@ debugAddBorders [] = []
 debugAddBorders (f:fs) = border (Absolute 2) (rgba 0 1 0 0.9) f : debugAddBorders fs
 
 debugAddBorder :: Frame -> Frame
-debugAddBorder f = border (Absolute 2) (rgba 0 1 0 0.9) f
+--debugAddBorder f = border (Absolute 2) (rgba 0 1 0 0.9) f -- delete comments for debug
+debugAddBorder = id

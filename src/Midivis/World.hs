@@ -9,7 +9,8 @@ module Midivis.World(World(..)
     , writeWorld
     , writeWorld'
     , isFixedFrame
-    , midiLength) where
+    , midiLength
+    , TuningScroll(..)) where
 
 import qualified Data.Vector.Storable as V
 import Data.Vector.Storable
@@ -21,34 +22,42 @@ import Control.Concurrent.STM.TQueue
 import Midivis.Midi.MidiParser (MidiEvent)
 import Midivis.Resources.Tuning.All
 import Midivis.Tuning.TuningParser
+import Midivis.Tuning.Scala
 
 newtype MidiEventBuffer = MidiEventBuffer (Vector MidiEvent) 
 instance Show MidiEventBuffer where show (MidiEventBuffer buf) = show $ V.toList buf
 instance Semigroup MidiEventBuffer where (MidiEventBuffer a) <> (MidiEventBuffer b) =MidiEventBuffer $ a V.++ b 
 instance Monoid MidiEventBuffer where mempty = MidiEventBuffer( V.fromList [] )
 
+data TuningScroll = Next | Stop | Prev
+    deriving (Eq, Show)
+
 data World =  World 
     {
         -- timing
-        time :: Float,
+        time :: !Float,
+        totalFrames :: !Integer,
         -- gui stuff
-        fixedFrameRate :: Integer,
-        fixedFrameCounter :: Float,
-        baseAngle :: Double,
-        clockVelocity :: Double, 
-        bufferVelocity :: Double,
+        fixedFrameRate :: !Integer,
+        fixedFrameCounter :: !Float,
+        baseAngle :: !Double,
+        clockVelocity :: !Double, 
+        bufferVelocity :: !Double,
         -- midi and tuning
-        midiEvtBuf :: MidiEventBuffer,
+        midiEvtBuf :: !MidiEventBuffer,
         midiEvtCpy :: SV.Vector MidiEvent,
         midiEvtQue :: !(TQueue (SV.Vector MidiEvent)),
-        sclOfChoice :: Scala
-    
+        sclIndex :: !Int,
+        freqA4 :: !Double,
+        tuningScroll :: TuningScroll,
+        sclOfChoice :: !Scala
     }
 
 initWorld :: TQueue (SVB.Vector MidiEvent) -> World
 initWorld tq = World {
     -- timing
     time = 0.0, 
+    totalFrames = 0,
     -- gui stuff
     fixedFrameRate = 144, 
     fixedFrameCounter = 0.0, 
@@ -59,7 +68,10 @@ initWorld tq = World {
     midiEvtBuf = mempty, 
       --midiEvtCpy = , just leave it, we'll update it once we have updated midi thread
     midiEvtQue = tq,
-    sclOfChoice = fiveSeven
+    sclIndex = 6,
+    freqA4 = 440,
+    tuningScroll = Stop,
+    sclOfChoice = calibrateA4 (edo12) 440
     }
 
 -- | Writes the World atomically

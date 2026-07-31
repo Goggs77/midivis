@@ -60,6 +60,7 @@ mainLoop w0TVar midiTQueue vp = forever $ do
         case evt e of
             NoteOn -> do
                 let noteId = valueL e
+                    velocity = valueR e -- unused
                 writeFreq vp noteId (getFreq scala noteId)
                 env <- readEnv vp noteId
                 -- Only retrigger Attack if voice is not already sustaining
@@ -85,5 +86,6 @@ mainLoop w0TVar midiTQueue vp = forever $ do
         env <- readEnv vp slot
         case env of
             Idle -> return ()
+            Release _ _-> return () -- don't write relase repeatedly
             _ | slot `H.member` heldSet -> return ()
               | otherwise               -> writeEnv vp slot defRelease

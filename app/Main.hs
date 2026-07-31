@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
 module Main where
 
 import Midivis.World
@@ -6,30 +7,51 @@ import Midivis.System.ExampleRenderer
 import Midivis.Synth.Engine
 import Midivis.Synth.Types
 import Midivis.Synth.Render (renderCallback)
+import Midivis.Synth.ConvReverb (newConvReverb)
+import Midivis.Resources.Audio.IR
 import Sound.PortAudio
 import qualified Sound.PortAudio.Base as Base
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
-import Data.IORef (newIORef)
+import Data.IORef (newIORef, readIORef, writeIORef, IORef)
+import Data.Array.IO (newArray)
 import System.IO (hPutStrLn, stderr)
 import Foreign.C.Types (CFloat)
 import Foreign.ForeignPtr (newForeignPtr_, withForeignPtr)
 import Foreign.Marshal.Array (allocaArray)
 import Foreign.Storable (poke, sizeOf)
-import Foreign.Ptr (plusPtr)
-import Control.Monad (forM_, forM, forever)
+import Foreign.Ptr (plusPtr, Ptr)
+import Control.Monad (forM_, forM, forever, when)
 import Data.List (maximumBy)
 import Data.Function (on)
 import Data.Maybe (catMaybes)
+import GHC.Conc
+import GHC.IO.Encoding
 
 main :: IO ()
 main = do
+    setLocaleEncoding utf8
+    -- Use all available cores (equivalent to +RTS -N)
+    setNumCapabilities =<< getNumProcessors
     -- === 1. Create shared state ===
     midiTQue <- newTQueueIO
     w0TVar <- newTVarIO $ initWorld midiTQue
-    let fpb = 256
+    let fpb = 512
         nch = 2
         sr  = defSampleRate
+    ir' <- ir
+    -- [DIAG] log IR stats
+    hPutStrLn stderr $ "[Reverb] IR samples=" ++ show (length ir') ++
+        " peak=" ++ show (maximum (0 : map abs ir')) ++
+        " sum=" ++ show (sum ir')
+    -- === 1b. Convolution reverb: load IR file embed ===
+    reverbObj <- newConvReverb defConvBlockSize ir' defConvDry defConvWet defConvGain
+    reverbRef <- newIORef reverbObj
+    -- Global sample counter, drives the random LFOs
+    smpRef <- newIORef (0.0 :: Double)
+    -- Per-voice smoothed amplitude (click-free aftertouch, 2nd order)
+    ampSmoothRef <- newIORef =<< newArray (0, 127) (0.0 :: Double)
+    ampMidRef    <- newIORef =<< newArray (0, 127) (0.0 :: Double)
 
     -- === 2. Start synth engine (forkIO mainLoop) ===
     vp <- initSynth w0TVar midiTQue
@@ -85,7 +107,7 @@ main = do
 
                     let callback :: StreamCallback CFloat CFloat
                         callback _time _flags nFrames _inp outPtr = do
-                            renderCallback vp sr (fromIntegral nFrames) outPtr phVar
+                            renderCallback vp sr (fromIntegral nFrames) outPtr phVar reverbRef smpRef ampSmoothRef ampMidRef
                             return Continue
 
                     withStream

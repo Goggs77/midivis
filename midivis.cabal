@@ -77,11 +77,15 @@ library
                         Midivis.Tuning.TuningParser,
                         Midivis.Tuning.Scala,
                         Midivis.Resources.Tuning.All,
+                        Midivis.Resources.Audio.IR,
                         Midivis.Synth.Engine,
                         Midivis.Synth.Types,
                         Midivis.Synth.Buffer,
-                        Midivis.Synth.Osc,
-                        Midivis.Synth.Render
+                        Midivis.Synth.Smooth,
+                        Midivis.Synth.Render,
+                        Midivis.Synth.Fft,
+                        Midivis.Synth.ConvReverb,
+                        Midivis.Synth.WavLoader
 
     -- sorry but keep it ascii
     other-modules:      Midivis.Resources.Tuning.Default,
@@ -98,11 +102,13 @@ library
     -- Other library packages from which modules are imported.
     -- We can't use GLFW-only since gloss always calls GLUT
     build-depends:    base ^>=4.20.1.0,
+                      array,
                       gloss-relative,
                       random,
                       linear,
                       vector,
                       extra,
+                      directory,
                       template-haskell,
                       binary,
                       bytestring,
@@ -132,6 +138,12 @@ executable midivis
     -- Import common warning flags.
     import:           warnings
 
+    -- Embed default RTS options into the executable:
+    --   -N      use all cores
+    --   -M2G    cap heap at 2GB (prevents runaway growth / OOM)
+    ghc-options:      -rtsopts=all
+                      -with-rtsopts=-M256M
+
     -- .hs or .lhs file containing the Main module.
     main-is:          Main.hs
 
@@ -148,7 +160,9 @@ executable midivis
                       RtMidi,
                       portaudio,
                       stm ^>=2.5.3.1,
-                      storablevector
+                      storablevector,
+                      directory,
+                      array
 
     -- Directories containing source files.
     hs-source-dirs:   app
