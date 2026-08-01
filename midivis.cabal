@@ -80,11 +80,11 @@ library
                         Midivis.Resources.Audio.IR,
                         Midivis.Synth.Engine,
                         Midivis.Synth.Types,
-                        Midivis.Synth.Buffer,
                         Midivis.Synth.Smooth,
                         Midivis.Synth.Render,
                         Midivis.Synth.Fft,
                         Midivis.Synth.ConvReverb,
+                        Midivis.Synth.AlgorithmicReverb,
                         Midivis.Synth.WavLoader
 
     -- sorry but keep it ascii

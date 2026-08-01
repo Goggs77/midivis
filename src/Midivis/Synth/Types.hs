@@ -199,15 +199,75 @@ defConvMaxTail :: Double
 defConvMaxTail = 1.5                   -- seconds
 
 -- | Mix levels: dry is the unprocessed signal, wet the convolved tail.
+--   NOTE on level balance: the wet path is a linear convolution, so for a
+--   sustained single tone the wet output is the *same sine*, scaled by the IR
+--   spectrum |H(f)| and phase-shifted by phi(f).  The dry/wet mix is therefore
+--   a vector sum — where the IR spectrum peaks (>+10 dB) and the phase is
+--   inverted, the wet cancels the dry and that note sounds weak (e.g. F#4).
+--   A pre-delay decouples the transient (attacks are never cancelled) and
+--   randomises the comb; keeping wet < dry bounds the deepest cancellation.
 defConvDry :: Double
 defConvDry = 0.8
 
 defConvWet :: Double
-defConvWet = 0.85
+defConvWet = 0.35
+
+-- | Per-bin magnitude limit applied to the IR spectrum before convolution.
+--   A plain energy normalisation leaves spectral peaks at +12..+20 dB; with
+--   wet comparable to dry, those peaks cancel the dry signal at comb notches
+--   and whole notes sound weak (e.g. F#4 at 370 Hz).  Limiting each bin keeps
+--   wet·|H(f)| below dry so no note can be cancelled.
+defConvSpectrumLimit :: Double
+defConvSpectrumLimit = 1.246
+
+-- | Pre-delay applied to the wet path only (seconds).  Left/right differ
+--   slightly to decorrelate the dry/wet comb between channels.
+defConvPreDelay :: Double
+defConvPreDelay = 0.025
+
+defConvPreDelayR :: Double
+defConvPreDelayR = 0.030
 
 -- | Master gain applied after the dry/wet mix.
 defConvGain :: Double
 defConvGain = 1.2
+
+--------------------------------------------------------------------------------
+-- Algorithmic reverb (Freeverb) — pre-reverb before the convolution
+--------------------------------------------------------------------------------
+
+-- | Room size 0..1: maps to comb feedback (0.7 + 0.28·room) → tail length.
+defAlgRoomSize :: Double
+defAlgRoomSize = 0.8
+
+-- | Comb low-pass damping 0..1: higher = darker, faster-decaying highs.
+defAlgDamp :: Double
+defAlgDamp = 0.443
+
+-- | Allpass diffusion gain 0..1: higher = denser, smoother tail.
+defAlgSpread :: Double
+defAlgSpread = 0.68
+
+-- | Wet-path pre-delay (seconds), like the convolution's own pre-delay.
+defAlgPreDelay :: Double
+defAlgPreDelay = 0.0074
+
+defAlgWet :: Double
+defAlgWet = 0.36
+
+defAlgDry :: Double
+defAlgDry = 0.45
+
+--------------------------------------------------------------------------------
+-- Stereo widening (dry path)
+--------------------------------------------------------------------------------
+
+-- | First-order allpass coefficient applied to the R channel only, right
+--   after mixing.  Phase decorrelation vs. L gives interaural width; 0
+--   disables (L=R again).  Combined with the algorithmic reverb's L/R
+--   delay-table difference the whole chain carries stereo information.
+defStereoWidth :: Double
+defStereoWidth = 0.1
 
 --------------------------------------------------------------------------------
 -- Random LFO (amplitude wobble on the two partials)
@@ -221,6 +281,8 @@ defLFORate1 = 0.8                    -- Hz
 defLFORate2 :: Double
 defLFORate2 = 1.7                    -- Hz
 
+-- | LFO 3 (3rd/4th harmonic): fastest and deepest — the highest partials
+--   wobble the most, keeping the spectral "breathing" layered.
 defLFORate3 :: Double
 defLFORate3 = 2.5
 

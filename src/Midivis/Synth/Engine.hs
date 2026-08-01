@@ -40,7 +40,8 @@ mainLoop w0TVar midiTQueue vp = forever $ do
     w0 <- readWorld w0TVar
     let scala = sclOfChoice w0
 
-    -- Build a set of noteIds that are currently held.
+    -- Phase 0: collect the set of noteIds currently held (repeated NoteOns
+    -- for the same key arrive every frame while it is pressed).
     let heldSet = foldEvents H.empty midiEvts
           where
             foldEvents !acc evts =
@@ -54,13 +55,13 @@ mainLoop w0TVar midiTQueue vp = forever $ do
                                 _         -> go (i + 1) s
                 in go 0 acc
 
-    -- Phase 1: process all incoming events -> write to their noteId slots
+    -- Phase 1: apply each incoming event to its noteId slot.
     forM_ [0 .. SV.length midiEvts - 1] $ \i -> do
         let e = midiEvts `SV.index` i
         case evt e of
             NoteOn -> do
                 let noteId = valueL e
-                    velocity = valueR e -- unused
+                    velocity = valueR e -- unused (fixed per-note gain)
                 writeFreq vp noteId (getFreq scala noteId)
                 env <- readEnv vp noteId
                 -- Only retrigger Attack if voice is not already sustaining
@@ -73,15 +74,19 @@ mainLoop w0TVar midiTQueue vp = forever $ do
                     Sustain{} -> return ()
                     _ -> do
                         writeEnv vp noteId defAttack
+                        -- Randomise the start phase on a fresh voice so
+                        -- repeated notes don't hit the same waveform sample.
                         when (env == Idle) $
                             writePhase vp noteId =<< randomRIO (0.0, 1.0)
             PolyphonicAftertouch -> do
                 let noteId = valueL e
                     amp    = fromIntegral (valueR e) / 127.0
+                -- Write the target amp; the audio callback smooths it
+                -- (two-stage cascade) so pressure glides instead of clicking.
                 writeAmp vp noteId amp
             _ -> return ()
 
-    -- Phase 2: release voices whose noteId is no longer being held
+    -- Phase 2: release voices whose noteId is no longer being held.
     forM_ [0 .. 127] $ \slot -> do
         env <- readEnv vp slot
         case env of

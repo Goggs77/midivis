@@ -1,5 +1,4 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE BangPatterns #-}
 module Main where
 
 import Midivis.World
@@ -8,6 +7,7 @@ import Midivis.Synth.Engine
 import Midivis.Synth.Types
 import Midivis.Synth.Render (renderCallback)
 import Midivis.Synth.ConvReverb (newConvReverb)
+import Midivis.Synth.AlgorithmicReverb (newAlgReverb, defAlgParams)
 import Midivis.Resources.Audio.IR
 import Sound.PortAudio
 import qualified Sound.PortAudio.Base as Base
@@ -47,6 +47,9 @@ main = do
     -- === 1b. Convolution reverb: load IR file embed ===
     reverbObj <- newConvReverb defConvBlockSize ir' defConvDry defConvWet defConvGain
     reverbRef <- newIORef reverbObj
+    -- === 1c. Algorithmic reverb (Freeverb pre-reverb) + stereo widener ===
+    algRef <- newIORef =<< newAlgReverb defAlgParams
+    widthRef <- newIORef (0.0, 0.0 :: Double)
     -- Global sample counter, drives the random LFOs
     smpRef <- newIORef (0.0 :: Double)
     -- Per-voice smoothed amplitude (click-free aftertouch, 2nd order)
@@ -61,7 +64,8 @@ main = do
     _ <- forkIO $ do
         hPutStrLn stderr "[Audio] Initializing PortAudio..."
         r <- withPortAudio $ do
-            -- probe devices 0..4 with a quick test
+            -- probe devices 0..4: open each, blast a 440Hz test tone, keep the
+            -- first one that produces no error (device 0 is often a phantom).
             let probe devIdx = do
                     let outParams = Just (StreamParameters (fromIntegral devIdx) (fromIntegral nch) (Base.PaTime 0.1))
                     result <- withStream
@@ -103,11 +107,16 @@ main = do
                 Right devIdx -> do
                     hPutStrLn stderr $ "[Audio] Using device " ++ show devIdx
                     let outParams = Just (StreamParameters (fromIntegral devIdx) (fromIntegral nch) (Base.PaTime 0.1))
+                    -- Compressor gain state, carried across callbacks.
                     phVar <- newIORef (1.0 :: Double)
 
+                    -- The real-time callback: render one frame (fpb = 2048,
+                    -- ~21 ms of audio at 96 kHz) and hand it to PortAudio.
+                    -- fpb is the only knob that trades latency vs. tolerance
+                    -- for the reverb's processBlock burst + system jitter.
                     let callback :: StreamCallback CFloat CFloat
                         callback _time _flags nFrames _inp outPtr = do
-                            renderCallback vp sr (fromIntegral nFrames) outPtr phVar reverbRef smpRef ampSmoothRef ampMidRef
+                            renderCallback vp sr (fromIntegral nFrames) outPtr phVar reverbRef algRef smpRef ampSmoothRef ampMidRef widthRef
                             return Continue
 
                     withStream

@@ -44,10 +44,12 @@ bitReverse n i = go 0 i (n `div` 2)
 
 -- | In-place forward FFT.  @re@ and @im@ hold the real/imaginary parts of the
 --   input (length @n@); on return they hold the spectrum.  No allocation.
+--   Iterative radix-2 Cooley-Tukey: bit-reversal permutation first, then
+--   log2(n) butterfly stages doubling the transform length each time.
 fftInPlace :: FftPlan -> IOUArray Int Double -> IOUArray Int Double -> IO ()
 fftInPlace plan re im = do
     let n = fpN plan
-    -- bit-reversal permutation
+    -- 1. bit-reversal permutation (precomputed index table, O(1) per swap)
     forM_ [0 .. n - 1] $ \i -> do
         j <- unsafeRead (fpRev plan) i
         when (i < j) $ do
@@ -59,7 +61,8 @@ fftInPlace plan re im = do
             unsafeWrite im i ij
             unsafeWrite re j ri
             unsafeWrite im j ii
-    -- butterflies
+    -- 2. butterflies: len doubles each stage (2, 4, 8, ... n); twiddles come
+    --    from the precomputed cos/sin tables (indexed by j·step, O(1) each).
     let goLen :: Int -> IO ()
         goLen !len
             | len > n    = return ()
@@ -87,6 +90,7 @@ fftInPlace plan re im = do
     goLen 2
 
 -- | In-place inverse FFT (normalised output).
+--   IFFT = conjugate → forward FFT → conjugate, scaled by 1/n.
 ifftInPlace :: FftPlan -> IOUArray Int Double -> IOUArray Int Double -> IO ()
 ifftInPlace plan re im = do
     let n = fpN plan

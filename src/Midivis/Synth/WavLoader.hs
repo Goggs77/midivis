@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+
 -- | Minimal WAV loader for impulse responses.
 --   Supports PCM 16/24/32-bit and IEEE float 32-bit; stereo is mixed to mono.
 --   Returns normalised samples in [-1, 1].
@@ -85,7 +85,7 @@ decode24 bs
     | otherwise =
         let (b0, b1) = BS.splitAt 3 bs
             bytes = BS.unpack b0
-            s0 = fromIntegral (bytes !! 0) :: Int
+            s0 = fromIntegral (head bytes) :: Int
             s1 = fromIntegral (bytes !! 1) :: Int
             s2 = fromIntegral (bytes !! 2) :: Int
             signed = if s2 < 128
