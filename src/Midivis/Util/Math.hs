@@ -13,6 +13,12 @@ log2 x = log x / ln2
 log10 :: Double -> Double
 log10 x = log x / ln10
 
+rad2deg :: Double -> Double
+rad2deg = (57.29577951308232*)
+
+deg2rad :: Double -> Double
+deg2rad = (1.7453292519943295e-2*)
+
 scaleNum :: Double -> Double -> Double -> Double -> [Double] -> [Double]
 scaleNum inf1 sup1 inf2 sup2 = map (\x -> (sup2 - inf2)*(x - inf1)/(sup1 - inf1) + inf2) 
 
@@ -42,8 +48,14 @@ fromDBFS dBFS = 10.0 ** (dBFS / 20.0) -- fixed sign issues
 toDBFS :: Double -> Double
 toDBFS linear = log10 linear * (-20.0)
 
+zeroRelative :: UnitPoint
+zeroRelative = (Relative 0, Relative 0)
+
 (.*) :: UnitPoint -> Float -> UnitPoint
 (.*) (Relative x, Relative y) f = (Relative (x*f), Relative (y*f))
 (.*) (Absolute x, Absolute y) f = (Absolute (x*f), Absolute (y*f))
 (.*) (Absolute x, Relative y) f = (Absolute (x*f), Relative (y*f))
 (.*) (Relative x, Absolute y) f = (Relative (x*f), Absolute (y*f))
+
+tf21 :: (a -> b -> c -> d) -> (b -> a -> c -> d)
+tf21 f b a = f a b
