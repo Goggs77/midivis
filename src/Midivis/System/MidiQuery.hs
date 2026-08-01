@@ -53,6 +53,10 @@ bufferMidi inputDevice w0 = do
         Just e  -> appendMidiEvent e w0
 
 -- | Clean up MidiEventBuffer, also avoid thread blocking operations and speed-up calculations
+--   Runs every frame (1 kHz).  Sorts events by noteId, pairs NoteOffs against
+--   held NoteOns, associates aftertouch/PB with their notes, and ships the
+--   result to the engine queue.  Only the active NoteOns are kept in the
+--   buffer for the next frame's held-note matching.
 cleanBuffer :: World -> IO World
 cleanBuffer w0 = do
     let buf = (unpack $ midiEvtBuf w0)
@@ -62,6 +66,7 @@ cleanBuffer w0 = do
     if V.null buf
         then return w0
         else do
+            -- 1. split by event type, NoteOns/NoteOffs sorted by noteId
             let noteOns  = sortBy valueL $ V.filter (\e -> evt e == NoteOn) buf
                 noteOffs = sortBy valueL $ V.filter (\e -> evt e == NoteOff) buf
                 notePpA  = V.filter (\e -> evt e == PolyphonicAftertouch) buf
@@ -72,11 +77,14 @@ cleanBuffer w0 = do
                     hPutStrLn stderr "[Midi] Warning: discarding unbalanced frame (NoteOn < NoteOff)"
                     return w0{midiEvtBuf = mempty}
                 else do
+                    -- 2. pair NoteOffs with held NoteOns, keep aftertouch/PB
+                    --    only for notes that are actually sounding
                     let processedOns = filterSortedByKey valueL noteOffs noteOns
                         processedPpA = takeSameIdWith valueL processedOns notePpA
                         processedPB  = takeSameIdWith valueL processedOns notePB
                         processedAll = V.force $ processedOns V.++ processedPpA V.++ processedPB
                         sv = copyElements processedAll
+                    -- 3. ship to the engine (it blocks on this queue)
                     sv `seq` atomically $ writeTQueue (midiEvtQue w0) sv
                     -- Keep only the active NoteOns in the buffer for the next
                     -- frame's held-note matching.  Aftertouch/PB are consumed

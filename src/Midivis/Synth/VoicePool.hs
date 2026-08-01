@@ -68,11 +68,14 @@ writeEnv pool i v = withSlot pool i $ \p -> pokeByteOff p 24 v
 -- Full-slot operations
 --------------------------------------------------------------------------------
 
--- | Read all four fields of a voice slot (32 bytes total).
+-- | Snapshot all four fields of a voice slot (32 bytes, non-atomic read).
+--   Used once per block per slot by the audio callback.  Each field write is
+--   ≤8 bytes (atomic on x86_64), so a torn read only mixes fields across a
+--   transition — phase/envelope stay continuous, no click results.
 readVoice :: VoicePool -> Int -> IO VoiceParams
 readVoice pool i = withSlot pool i peek
 
--- | Write all four fields atomically.
+-- | Write all four fields in one 32-byte poke (used for setup only).
 writeVoice :: VoicePool -> Int -> VoiceParams -> IO ()
 writeVoice pool i v = withSlot pool i $ \p -> poke p v
 
