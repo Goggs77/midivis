@@ -28,7 +28,7 @@ defChunkSizeNum :: Double
 defChunkSizeNum = 64
 
 defSampleRate :: Double
-defSampleRate = 96000.0
+defSampleRate = 48000.0
 
 --------------------------------------------------------------------------------
 -- Duration scaling: [0,1] ↔ [0.001s, 60s] via log10 mapping
@@ -90,20 +90,20 @@ instance Storable EnvelopeState where
             param2      = castWord32ToFloat (fromIntegral (w .&. 0xFFFFFFFF) :: Word32)
         case tag of
             0 -> pure Idle
-            1 -> pure $ Attack  (unscaleDuration param1Frac) param2
-            2 -> pure $ Decay   (unscaleDuration param1Frac) param2
+            1 -> pure $ Attack  (scaleDuration param1Frac) param2
+            2 -> pure $ Decay   (scaleDuration param1Frac) param2
             3 -> pure $ Sustain param1Frac   -- level is already [0,1]
-            4 -> pure $ Release (unscaleDuration param1Frac) param2
+            4 -> pure $ Release (scaleDuration param1Frac) param2
             _ -> pure Idle
       where
         max29 = 0x1FFFFFFF :: Float
 
     poke ptr = \case
         Idle           -> pokeByteOff ptr 0 (0 :: Word64)
-        Attack  d c    -> pokeEnc 1 (scaleDuration d) (castFloatToWord32 c)
-        Decay   d c    -> pokeEnc 2 (scaleDuration d) (castFloatToWord32 c)
+        Attack  d c    -> pokeEnc 1 (unscaleDuration d) (castFloatToWord32 c)
+        Decay   d c    -> pokeEnc 2 (unscaleDuration d) (castFloatToWord32 c)
         Sustain l      -> pokeEnc 3 l 0
-        Release d c    -> pokeEnc 4 (scaleDuration d) (castFloatToWord32 c)
+        Release d c    -> pokeEnc 4 (unscaleDuration d) (castFloatToWord32 c)
         where
             pokeEnc :: Word64 -> Float -> Word32 -> IO ()
             pokeEnc tag frac w32 =
@@ -165,7 +165,7 @@ defVoiceParams :: VoiceParams
 defVoiceParams = VoiceParams 0xFFFFFFFF 0 0 Idle
 
 defNormalizeAmp :: Double
-defNormalizeAmp = fromDBFS (-9.0)    -- -9dBFS per voice
+defNormalizeAmp = fromDBFS (-18.0)
 
 --------------------------------------------------------------------------------
 -- Convolution reverb parameters
@@ -287,7 +287,7 @@ defLFORate3 :: Double
 defLFORate3 = 2.5
 
 defLFODepth1 :: Double
-defLFODepth1 = 0.1                  -- ±10%
+defLFODepth1 = 0.18                  -- ±18%
 
 defLFODepth2 :: Double
 defLFODepth2 = 0.19                  -- ±19%

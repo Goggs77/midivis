@@ -172,12 +172,14 @@ processSample ch x room damp spread = do
                 goAp (k + 1) (-spread * inp + bufout)
     goAp 0 combSum
 
--- | Circular pre-delay on the wet path (write pos, read pos → ring delay).
+-- | Circular pre-delay on the wet path.  True ring: read the OLD value at
+--   @pos@ (written acPreLen samples ago) FIRST, then overwrite with @y@ —
+--   writing before reading collapses the delay to zero.
 delaySample :: AlgChannel -> Double -> IO Double
 delaySample ch y = do
     pos <- readIORef (acPrePos ch)
-    unsafeWrite (acPreBuf ch) pos y
     out <- unsafeRead (acPreBuf ch) pos
+    unsafeWrite (acPreBuf ch) pos y
     let pos' = pos + 1
     writeIORef (acPrePos ch) (if pos' >= acPreLen ch then 0 else pos')
     return out
