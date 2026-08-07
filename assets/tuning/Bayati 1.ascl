@@ -1,0 +1,42 @@
+! Bayati 1.ascl
+!
+! Short description:
+A version of Bayati usable for most Egyptian and Levantine repertory, including the most typical modulations, except for a full use of Bayati Shuri (which requires a B♮). This version of Bayati was developed by Sami Abu Shumays. Visit the website to learn more.
+!
+! Long description: This represents a version of Bayati usable for most Egyptian and Levantine repertory, including the most typical modulations, except for a full use of Bayati Shuri (which requires a B♮); Kurd is passable here (D-E♭-F-G), but only really in the context of Ajam B♭ (a true Kurd would have a higher E♭). Jins Hijaz also doesn't sound great with this low E♭; a higher version would be better. E.g. "Ba3eed 3annak," "Ah Ya Hilu," "Samai Bayati il-Aryan." This version of Bayati was developed by Sami Abu Shumays. Visit the website to learn more.
+!
+! Jins modulations possible within this pitch set:
+! Bayati D: D E1/2♭ F G (A) (B♭)
+! Saba D (maqam and jins): D E1/2♭ F G♭ A B♭ C D♭
+! Hijaz D: D E♭ F♯ G (A)
+! Bayati Shuri (Jins only): D E1/2♭ F G A♭
+! Nahawand G: G A B♭ C D
+! Nahawand Murassaa G: G A B♭ C D♭
+! Ajam B♭: B♭ C D E♭ F
+! Rast G: G A B1/2♭ C D
+! Sikah B1/2♭: B1/2♭ C D E♭
+!
+! References:
+! Inside Arabic Music, Chapter 11 (description of Tuning System); Ch 14-16 (descriptions of Ajnas); Ch 24 (Sayr diagrams)
+! http://maqamworld.com/en/index.php  * Maqam World Website, including Maqam and Jins Scales
+! https://www.youtube.com/user/abushumays * "Maqam Lessons" YouTube series, teaching the melodic vocabulary of the ajnas and maqamat
+!
+12
+!
+90.     ! E♭ for Ajam B♭
+143.    ! E1/2♭ for Bayati & Saba D
+294.    ! F Pythagorean
+388.    ! F♯/G♭ for Hijaz D; also G♭ for use in Saba D
+498.    ! G Pythagorean
+617.    ! A♭ bayati Shuri
+707.    ! A higher than Pythagorean
+792.    ! B♭ Pythagorean
+845.    ! B1/2♭ for Rast G
+996.    ! C Pythagorean
+1080.   ! D♭ for use in Saba D (And Nahawand Murassaa G)
+1200.
+!
+! @ABL NOTE_NAMES D E♭ E1/2♭ F F♯ G A♭ A B♭ B1/2♭ C D♭
+! @ABL REFERENCE_PITCH 3 0 293.6648
+! @ABL SOURCE Inside Arabic Music, Chapter 11 (description of Tuning System); Ch 14-16 (descriptions of Ajnas); Ch 24 (Sayr diagrams)
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/bayati-1

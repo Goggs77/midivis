@@ -1,0 +1,24 @@
+! 11-ED3_2 Wendy Carlos beta.ascl
+!
+Wendy Carlos 'beta', one of three equal division scales developed while working on the album "Beauty in the Beast" (1986). Beta divides the 2:3 perfect fifth into 11 proportionally equal and equal sounding parts (ca. 63.8 cents each).
+!
+! Wendy Carlos alpha beta gamma tunings https://www.wendycarlos.com/resources/pitch.html
+!
+11
+!
+63.814091 ! 1\11 (3/2)
+127.628182 ! 2\11 (3/2)
+191.442273 ! 3\11 (3/2)
+255.256364 ! 4\11 (3/2)
+319.070455 ! 5\11 (3/2)
+382.884546 ! 6\11 (3/2)
+446.698637 ! 7\11 (3/2)
+510.512728 ! 8\11 (3/2)
+574.326819 ! 9\11 (3/2)
+638.14091 ! 10\11 (3/2)
+3/2 ! 0\11 (3/2)
+!
+! @ABL NOTE_NAMES "0\11 (3/2)" "1\11 (3/2)" "2\11 (3/2)" "3\11 (3/2)" "4\11 (3/2)" "5\11 (3/2)" "6\11 (3/2)" "7\11 (3/2)" "8\11 (3/2)" "9\11 (3/2)" "10\11 (3/2)"
+! @ABL REFERENCE_PITCH 3 0 440.0
+! @ABL NOTE_RANGE_BY_INDEX -4 8 8 3
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/11-ed3_2-wendy-carlos-beta

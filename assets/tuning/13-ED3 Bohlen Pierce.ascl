@@ -1,0 +1,23 @@
+! 13-ED3 Bohlen Pierce.ascl
+!
+Bohlen-Pierce scale dividing the 3/1 into 13 proportionally equal and equal sounding intervals of 146.304231 cents each.
+13
+!
+146.304231 ! 1\13 (3)
+292.608462 ! 2\13 (3)
+438.912693 ! 3\13 (3)
+585.216923 ! 4\13 (3)
+731.521154 ! 5\13 (3)
+877.825385 ! 6\13 (3)
+1024.129616 ! 7\13 (3)
+1170.433847 ! 8\13 (3)
+1316.738078 ! 9\13 (3)
+1463.042308 ! 10\13 (3)
+1609.346539 ! 11\13 (3)
+1755.65077 ! 12\13 (3)
+3/1 ! 0\13 (3)
+!
+! @ABL NOTE_NAMES "0\13 (3)" "1\13 (3)" "2\13 (3)" "3\13 (3)" "4\13 (3)" "5\13 (3)" "6\13 (3)" "7\13 (3)" "8\13 (3)" "9\13 (3)" "10\13 (3)" "11\13 (3)" "12\13 (3)"
+! @ABL REFERENCE_PITCH 3 0 440.0
+! @ABL NOTE_RANGE_BY_INDEX -3 9 7 6
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/13-ed3-bohlen-pierce

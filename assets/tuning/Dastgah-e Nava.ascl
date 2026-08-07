@@ -1,0 +1,22 @@
+! Dastgah-e Nava.ascl
+!
+In terms of intervals, the Dastgāh-e Navā has a close relationship with the Šur, and many of its Guše-ha (sub-modes) are structured in the modal scheme of Šur. The modal scheme of dastgāh-e Navā is similar to the Maqam-e Navā, one of the maqams described by the 11th-century music theorist Muhammad Nishāburi. This version of Navā has D as the first scale degree (aqaz).
+!
+! Hints:
+! Third degree/tone of the scale = as the starting point of the improvisation
+! Fourth degree/tone of the scale = as the finalis
+!
+7
+!
+205.
+340.
+500.
+700.
+905.
+995.
+1200.
+!
+! @ABL NOTE_NAMES "C" "D" "E koron" "F" "G" "A" "B♭"
+! @ABL REFERENCE_PITCH 3 0 261.63
+! @ABL NOTE_RANGE_BY_INDEX -6 3 12 4
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/dastgah-e-nava

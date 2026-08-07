@@ -1,0 +1,26 @@
+! 13-EDO.ascl
+!
+13 equal divisions of an octave. 13 proportionally equal and equal sounding semitone intervals per octave.
+!
+! default tuning: degree 0 = 261.625565 Hz (12edo C tuning) *OR* degree 0 = 258.1613012 Hz (so that degree 10 = 440 Hz)
+!
+13
+!
+92.30769231 ! 1\13
+184.6153846 ! 2\13
+276.9230769 ! 3\13
+369.2307692 ! 4\13
+461.5384615 ! 5\13
+553.8461538 ! 6\13
+646.1538462 ! 7\13
+738.4615385 ! 8\13
+830.7692308 ! 9\13
+923.0769231 ! 10\13
+1015.384615 ! 11\13
+1107.692308 ! 12\13
+2/1 ! 0\13
+!
+! @ABL NOTE_NAMES "0\13 " "1\13 " "2\13 " "3\13 " "4\13 " "5\13 " "6\13 " "7\13 " "8\13 " "9\13 " "10\13 " "11\13 " "12\13 "
+! @ABL REFERENCE_PITCH 3 10 440.0
+! @ABL NOTE_RANGE_BY_INDEX -2 6 8 3
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/13-edo

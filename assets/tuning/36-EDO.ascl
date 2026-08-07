@@ -1,0 +1,49 @@
+! 36-EDO.ascl
+!
+36 equal divisions of an octave. 36 proportionally equal and equal sounding semitone intervals per octave.
+!
+! default tuning: degree 27 (900.0 cents) 440 Hz, or degree 0 = 261.625565 Hz
+!
+36
+!
+33.33333333 ! >C
+66.66666667 ! <D♭
+100.0 ! C♯|D♭
+133.3333333 ! >C♯
+166.6666667 ! <D
+200.0 ! D
+233.3333333 ! >D
+266.6666667 ! <E♭
+300.0 ! D♯|E♭
+333.3333333 ! >D♯
+366.6666667 ! <E
+400.0 ! E
+433.3333333 ! >E
+466.6666667 ! <F
+500.0 ! F
+533.3333333 ! >F
+566.6666667 ! <G♭
+600.0 ! F♯|G♭
+633.3333333 ! >F♯
+666.6666667 ! <G
+700.0 ! G
+733.3333333 ! >G
+766.6666667 ! <A♭
+800.0 ! G♯|A♭
+833.3333333 ! >G♯
+866.6666667 ! <A
+900.0 ! A
+933.3333333 ! >A
+966.6666667 ! <B♭
+1000.0 ! A♯|B♭
+1033.333333 ! >A♯
+1066.666667 ! <B
+1100.0 ! B
+1133.333333 ! >B
+1166.666667 ! <C
+2/1 ! C
+!
+! @ABL NOTE_NAMES "C" ">C" "<D♭" "C♯|D♭" ">C♯" "<D" "D" ">D" "<E♭" "D♯|E♭" ">D♯" "<E" "E" ">E" "<F" "F" ">F" "<G♭" "F♯|G♭" ">F♯" "<G" "G" ">G" "<A♭" "G♯|A♭" ">G♯" "<A" "A" ">A" "<B♭" "A♯|B♭" ">A♯" "<B" "B" ">B" "<C"
+! @ABL REFERENCE_PITCH 3 27 440.0
+! @ABL NOTE_RANGE_BY_INDEX 1 30 5 13
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/36-edo

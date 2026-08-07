@@ -1,0 +1,22 @@
+! 9-ED3_2 Wendy Carlos alpha.ascl
+!
+Wendy Carlos 'alpha', one of three equal division scales developed while working on the album "Beauty in the Beast" (1986). Alpha divides the 2:3 perfect fifth into 9 proportionally equal and equal sounding parts (ca. 78 cents each).
+!
+! Wendy Carlos alpha beta gamma tunings https://www.wendycarlos.com/resources/pitch.html
+!
+9
+!
+77.995 ! 1\9 (3/2)
+155.99 ! 2\9 (3/2)
+233.985 ! 3\9 (3/2)
+311.98 ! 4\9 (3/2)
+389.975 ! 5\9 (3/2)
+467.970001 ! 6\9 (3/2)
+545.965001 ! 7\9 (3/2)
+623.960001 ! 8\9 (3/2)
+3/2 ! 0\9 (3/2)
+!
+! @ABL NOTE_NAMES "0\9 (3/2)" "1\9 (3/2)" "2\9 (3/2)" "3\9 (3/2)" "4\9 (3/2)" "5\9 (3/2)" "6\9 (3/2)" "7\9 (3/2)" "8\9 (3/2)"
+! @ABL REFERENCE_PITCH 3 0 440.0
+! @ABL NOTE_RANGE_BY_INDEX -5 3 9 4
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/9-ed3_2-wendy-carlos-alpha

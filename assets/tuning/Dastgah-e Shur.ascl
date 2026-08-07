@@ -1,0 +1,23 @@
+! Dastgah-e Shur.ascl
+!
+Due to its extensive repertoire in folklore and classical Iranian music and its vast sub-modes, Dastgāh-e Šur is considered the most essential Iranian musical mode. Dastgāh-e Šur has ancient roots and is regarded as the basis of most folk music in different regions of Iran. However, unlike some other Dastgāh-ha (such as Segāh, Čahārgāh or Navā), Dastgāh-e Šur was not among the main Maqamat of old Iranian music. This version of Šur has C as the first scale degree (aqaz).
+!
+! Hints:
+! First degree/tone of the scale = as the starting point of the improvisation
+! Second degree/tone of the scale = as the finalis
+! Sixth degree/tone of the scale = could be lowered one-quarter tone (to A koron) to emphasize the fifth degree of the scale, i.e. G.
+!
+7
+!
+205.
+340.
+500.
+700.
+905.
+995.
+1200.
+!
+! @ABL NOTE_NAMES "C" "D" "E koron" "F" "G" "A" "B♭"
+! @ABL REFERENCE_PITCH 3 0 261.63
+! @ABL NOTE_RANGE_BY_INDEX -6 3 12 4
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/dastgah-e-shur

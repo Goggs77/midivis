@@ -1,0 +1,35 @@
+! 22-EDO.ascl
+!
+22 equal divisions of an octave. 22 proportionally equal and equal sounding semitone intervals per octave.
+!
+! default tuning: degree 17 (927.2727273 cents) 440 Hz, or degree 0 = 257.5363812 Hz
+!
+22
+!
+54.54545455 ! tC
+109.0909091 ! C♯|D♭
+163.6363636 ! dD
+218.1818182 ! D
+272.7272727 ! tD
+327.2727273 ! D♯|E♭
+381.8181818 ! dE
+436.3636364 ! E
+490.9090909 ! F
+545.4545455 ! tF
+600.0 ! F♯|G♭
+654.5454545 ! dG
+709.0909091 ! G
+763.6363636 ! tG
+818.1818182 ! G♯|A♭
+872.7272727 ! dA
+927.2727273 ! A
+981.8181818 ! tA
+1036.363636 ! A♯|B♭
+1090.909091 ! dB
+1145.454545 ! B
+2/1 ! C
+!
+! @ABL NOTE_NAMES "C" "tC" "C♯|D♭" "dD" "D" "tD" "D♯|E♭" "dE" "E" "F" "tF" "F♯|G♭" "dG" "G" "tG" "G♯|A♭" "dA" "A" "tA" "A♯|B♭" "dB" "B"
+! @ABL REFERENCE_PITCH 3 17 440.0
+! @ABL NOTE_RANGE_BY_INDEX 0 14 6 9
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/22-edo

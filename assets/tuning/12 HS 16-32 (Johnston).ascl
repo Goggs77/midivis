@@ -1,0 +1,24 @@
+! 12 HS 16-32 (Johnston).ascl
+!
+12-tone harmonic series subset consisting of partials 16°, 17°, 18°, 19°, 20°, 21°, 22°, 24°, 26°, 27°, 28°, 30°, (32°), used by Ben Johnston in "Suite for Microtonal Piano" (1977). Fundamental (16°) is on C. Partial 20° (E) is tuned to 330 Hz.
+!
+! default tuning: degree 0 = 264 Hz .... matching the C in quintal tuning.
+!
+12
+!
+17/16 ! ``C♯
+9/8 ! D
+19/16 ! ´E♭
+5/4 ! vE
+21/16 ! <F
+11/8 ! tF
+3/2 ! G
+13/8 ! d|A
+27/16 ! A
+7/4 ! <B♭
+15/8 ! vB
+2/1 ! C
+!
+! @ABL NOTE_NAMES "C" "``C♯" "D" "´E♭" "vE" "<F" "tF" "G" "d|A" "A" "<B♭" "vB"
+! @ABL REFERENCE_PITCH 3 0 264.0
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/12-hs-16-32-johnston

@@ -1,0 +1,37 @@
+! 24 Helmholtz temperament.ascl
+!
+Each fifth is narrowed by 1/8 of a schisma (about 0.25 cents) so that 8 fifths produce a 4:5 quintal major third. Quintal and tertial commas are both reduced to ca. 20.5 cents, so flats are enharmonic with comma-lowered sharp equivalents, and sharps are enharmonic with comma-raised equivalents.
+!
+! default tuning: degree 0 = 262.5151214 Hz / degree 9 = 440 Hz .... .
+!
+24
+!
+20.5294292 ! ^C
+91.44607117 ! D♭|vC♯
+111.9755004 ! ^D♭|C♯
+182.8921423 ! vD
+203.4215715 ! D
+294.8676427 ! E♭|vD♯
+315.3970719 ! ^E♭|D♯
+386.3137139 ! vE
+406.8431431 ! E
+498.2892142 ! F
+518.8186434 ! ^F
+589.7352854 ! G♭|vF♯
+610.2647146 ! ^G♭|F♯
+701.7107858 ! G
+722.240215 ! ^G
+793.1568569 ! A♭|vG♯
+813.6862861 ! ^A♭|G♯
+884.6029281 ! vA
+905.1323573 ! A
+996.5784285 ! B♭
+1017.107858 ! ^B♭|A♯
+1088.0245 ! vB
+1108.553929 ! B
+2/1 ! C
+!
+! @ABL NOTE_NAMES "C" "^C" "D♭|vC♯" "^D♭|C♯" "vD" "D" "E♭|vD♯" "^E♭|D♯" "vE" "E" "F" "^F" "G♭|vF♯" "^G♭|F♯" "G" "^G" "A♭|vG♯" "^A♭|G♯" "vA" "A" "B♭" "^B♭|A♯" "vB" "B"
+! @ABL REFERENCE_PITCH 3 9 440.0
+! @ABL NOTE_RANGE_BY_INDEX 0 12 5 19
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/24-helmholtz-temperament

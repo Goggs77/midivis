@@ -1,0 +1,32 @@
+! 19-EDO.ascl
+!
+19 equal divisions of an octave. 19 proportionally equal and equal sounding semitone intervals per octave.
+!
+! default tuning: degree 14 (884.2105263 cents) 440 Hz, or degree 0 = 264.0225983 Hz
+!
+19
+!
+63.15789474 ! C♯
+126.3157895 ! D♭
+189.4736842 ! D
+252.6315789 ! D♯
+315.7894737 ! E♭
+378.9473684 ! E
+442.1052632 ! E♯|F♭
+505.2631579 ! F
+568.4210526 ! F♯
+631.5789474 ! G♭
+694.7368421 ! G
+757.8947368 ! G♯
+821.0526316 ! A♭
+884.2105263 ! A
+947.3684211 ! A♯
+1010.526316 ! B♭
+1073.684211 ! B
+1136.842105 ! B♯|C♭
+2/1 ! C
+!
+! @ABL NOTE_NAMES "C" "C♯" "D♭" "D" "D♯" "E♭" "E" "E♯|F♭" "F" "F♯" "G♭" "G" "G♯" "A♭" "A" "A♯" "B♭" "B" "B♯|C♭"
+! @ABL REFERENCE_PITCH 3 14 440.0
+! @ABL NOTE_RANGE_BY_INDEX 0 2 6 15
+! @ABL LINK https://www.ableton.com/learn-more/tuning-systems/19-edo
