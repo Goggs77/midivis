@@ -3,7 +3,7 @@
 module Midivis.Synth.Render where
 
 import Prelude
-import Control.Monad (forM_, when)
+import Control.Monad (forM, forM_, when)
 import Data.Array.Base (unsafeRead, unsafeWrite)
 import Data.Array.IO (IOUArray)
 import Data.IORef (IORef, readIORef, writeIORef)
@@ -17,28 +17,10 @@ import Midivis.Synth.VoicePool
 import Midivis.Synth.Types
 import Midivis.Synth.ConvReverb (ConvReverb, processReverb)
 import Midivis.Synth.AlgorithmicReverb (AlgReverb, processAlgReverb)
+import Midivis.Synth.Preset (Voice(..), LfoParams(..), EnvParams(..), SynthCtx(..), smoothNoise)
+import Midivis.Synth.CtrlBus (CtrlBus, ccNorm)
 import Midivis.Util.Math
 import Data.Bits (shiftR, (.&.))
-
-
--- | Deterministic smooth-random LFO value in [-1, 1] at absolute sample
---   position @sampleCount@.  Sample-and-hold segments at @rate@ Hz joined by
---   linear interpolation; the hash is a wrapping Int multiply so no heap
---   allocation happens in the audio callback.
-smoothNoise :: Double -> Double -> Double -> Int -> Double
-smoothNoise sampleCount sr rate seed =
-    let pos  = sampleCount / sr * rate
-        seg  = floor pos :: Int
-        frac = pos - fromIntegral seg
-        v0   = noiseAt seg
-        v1   = noiseAt (seg + 1)
-    in v0 + (v1 - v0) * frac
-  where
-    noiseAt :: Int -> Double
-    noiseAt s =
-        let h = (fromIntegral s * 2654435761 + fromIntegral seed * 40503) * 1103515245 :: Int
-            u = fromIntegral ((h `shiftR` 16) .&. 0xFFFFFF) :: Double
-        in u / 8388607.5 - 1.0
 
 -- | Deterministic white-ish noise in [-0.01, 0.01] for an absolute sample
 --   position and voice slot.  Replaces per-sample 'randomRIO' in the real-time
@@ -54,12 +36,13 @@ detNoise s slot =
 -- | Render all active voices directly into a PortAudio output buffer.
 --   Bulk-reads VoicePool once, renders audio, advances phase per voice,
 --   then algorithmic reverb (Freeverb), convolution reverb (wet), then a
---   master compressor.  @algRef@ holds the tweakable pre-reverb; @widthRef@
---   the stereo-widener allpass state.
+--   master compressor.  @voice@ is the active voice; @bus@ the
+--   read-only CC control bus; @algRef@ holds the tweakable pre-reverb;
+--   @widthRef@ the stereo-widener allpass state.
 --   @ampSmoothRef@ / @ampMidRef@ hold per-voice two-stage smoothed amplitude
 --   (IOUArrays, 128 slots) so aftertouch glides instead of clicking.
-renderCallback :: VoicePool -> Double -> Int -> Ptr CFloat -> IORef Double -> IORef ConvReverb -> IORef AlgReverb -> IORef Double -> IORef (IOUArray Int Double) -> IORef (IOUArray Int Double) -> IORef (Double, Double) -> IO ()
-renderCallback vp sr nFrames outPtr gainRef reverbRef algRef smpRef ampSmoothRef ampMidRef widthRef = do
+renderCallback :: VoicePool -> Double -> Int -> Ptr CFloat -> IORef Double -> IORef ConvReverb -> IORef AlgReverb -> IORef Double -> IORef (IOUArray Int Double) -> IORef (IOUArray Int Double) -> IORef (Double, Double) -> IORef (Double, Double, Double, Double) -> CtrlBus -> Voice -> IO ()
+renderCallback vp sr nFrames outPtr gainRef reverbRef algRef smpRef ampSmoothRef ampMidRef widthRef dcRef bus voice = do
     -- 1. Zero the interleaved output buffer; every voice accumulates into it.
     forM_ [0 .. totalSamples - 1] $ \i ->
         pokeElemOff outPtr i (0.0 :: CFloat)
@@ -68,12 +51,17 @@ renderCallback vp sr nFrames outPtr gainRef reverbRef algRef smpRef ampSmoothRef
     --    is continuous across blocks but constant within one (no zipper).
     t0 <- readIORef smpRef
     writeIORef smpRef (t0 + fromIntegral nFrames)
-    let !lfo1 = smoothNoise t0 sr defLFORate1 defLFOSeed1
-        !lfo2 = smoothNoise t0 sr defLFORate2 defLFOSeed2
-        !lfo3 = smoothNoise t0 sr defLFORate3 defLFOSeed3
-        !m1   = 1.0 + lfo1 * defLFODepth1      -- fundamental: small wobble
-        !m2   = 1.0 + lfo2 * defLFODepth2      -- overtone: deeper wobble
-        !m3   = 0.79 + lfo3 * defLFODepth3      -- 3rd/4th harmonic: deepest
+    let !lfoVals = map (\lp -> smoothNoise t0 sr (lpRate lp) (lpSeed lp)) (vLfos voice)
+    -- CC bus snapshot, normalised [0,1], read once per block (128 reads are
+    -- negligible at one per frame).
+    ccSnap <- forM [0 .. 127] $ \i -> ccNorm bus i
+    -- putStrLn $ show ccSnap
+    -- Envelope states / levels derived from the preset (block-constant).
+    let pE = vEnv voice
+        !envDec  = Decay (epDecay pE) (epDecayCurve pE)
+        !envSus  = Sustain (epSustainLevel pE)
+        !susLvl  = realToFrac (epSustainLevel pE) :: Double
+        !ampK    = epAmpSmoothK pE
 
     ampSmoothArr <- readIORef ampSmoothRef
     ampMidArr    <- readIORef ampMidRef
@@ -102,33 +90,30 @@ renderCallback vp sr nFrames outPtr gainRef reverbRef algRef smpRef ampSmoothRef
                 -- before it is dropped — no stuck level, no click.
                 let !k1     = 0.5
                     !k2     = case env of
-                                Sustain _ -> defAmpSmoothK
+                                Sustain _ -> ampK
                                 _         -> 0.5
                     !s1'    = s1 + k1 * (amp - s1)
                     !s2'    = s2 + k2 * (s1' - s2)
                     !audible = amp /= 0 || s2 > 0.0001
                 when audible $ do
                     -- 3b. Sample loop: linear ramp s2 → s2' across the block
-                    -- (block boundary stays continuous, no click).
+                    -- (block boundary stays continuous, no click).  Each
+                    -- sample is produced by the pure core synthSample with
+                    -- the block's LFO values and CC snapshot in its context.
                     let !delta = (s2' - s2) / fromIntegral nFrames
                     forM_ [0 .. n - 1] (\f -> do
                         let !sf = fromIntegral f :: Double
                             !noise = detNoise (fromIntegral (round t0) + f) slot
                             !af = s2 + delta * fromIntegral (f + 1)
-                            !an = af * defNormalizeAmp
-                            -- Per-sample waveform: fundamental + 2nd/3rd/4th
-                            -- harmonics.  Each partial carries a log-frequency
-                            -- tilt compensation so high notes don't overload;
-                            -- m1/m2/m3 are the LFO modulators, the 4th
-                            -- harmonic is FM'd by the deterministic noise,
-                            -- and the sum goes through tanh before the final
-                            -- -9dBFS per-voice gain.
-                            !s  = realToFrac (tanh ( --with spectral amp adjustments
-                                m1 * sin (2 * pi * (ph + sf * step)) * 0.8  * (- 0.22 * log10 freq + 1.2) +
-                                m2 * sin (4 * pi * (ph + sf * step)) * 0.02 * an * (- 0.34 * log10 freq + 1.34) +
-                                m3 * sin (6 * pi * (ph + sf * step)) * 0.314 * an * (- 0.17 * log10 freq + 1.17) +
-                                m2 * sin (6 * pi * (ph + sf * step) * (noise + 1)) * 0.0114 * an * an * an
-                                ) * an) :: CFloat
+                            !ctx = SynthCtx
+                                { scFreq  = freq
+                                , scPhase = ph + sf * step
+                                , scCC    = ccSnap
+                                , scLfos  = lfoVals
+                                , scAmp   = af
+                                , scNoise = noise
+                                }
+                            !s = realToFrac (vSample voice ctx) :: CFloat
                         -- Accumulate into both channels (stereo, same signal).
                         curL <- peekElemOff outPtr (f * 2)
                         pokeElemOff outPtr (f * 2)     (curL + s)
@@ -155,10 +140,10 @@ renderCallback vp sr nFrames outPtr gainRef reverbRef algRef smpRef ampSmoothRef
                         | d <= bT -> guardWrite $ do
                             pokeByteOff (base `plusPtr` (slot * 32)) 16 newPh
                             pokeByteOff (base `plusPtr` (slot * 32)) 8  (1.0 :: Double)
-                            pokeByteOff (base `plusPtr` (slot * 32)) 24 defDecay
+                            pokeByteOff (base `plusPtr` (slot * 32)) 24 envDec
                         | otherwise -> guardWrite $ do
                             let !newD = d - bT
-                                !newA = amp + deltaPower amp 1.0 (realToFrac c) (realToFrac (bT / d)) amp
+                                !newA = clamp (0, 1) $ amp + deltaPower amp 1.0 (realToFrac c) (realToFrac (bT / d)) amp
                             pokeByteOff (base `plusPtr` (slot * 32)) 16 newPh
                             pokeByteOff (base `plusPtr` (slot * 32)) 8  newA
                             pokeByteOff (base `plusPtr` (slot * 32)) 24 (Attack newD c)
@@ -166,11 +151,11 @@ renderCallback vp sr nFrames outPtr gainRef reverbRef algRef smpRef ampSmoothRef
                     Decay d c
                         | d <= bT -> guardWrite $ do
                             pokeByteOff (base `plusPtr` (slot * 32)) 16 newPh
-                            pokeByteOff (base `plusPtr` (slot * 32)) 8  defSustainLevel'
-                            pokeByteOff (base `plusPtr` (slot * 32)) 24 defSustain
+                            pokeByteOff (base `plusPtr` (slot * 32)) 8  susLvl
+                            pokeByteOff (base `plusPtr` (slot * 32)) 24 envSus
                         | otherwise -> guardWrite $ do
                             let !newD = d - bT
-                                !newA = amp + deltaPower amp defSustainLevel' (realToFrac c) (realToFrac (bT / d)) amp
+                                !newA = clamp (0, 1) $ amp + deltaPower amp susLvl (realToFrac c) (realToFrac (bT / d)) amp
                             pokeByteOff (base `plusPtr` (slot * 32)) 16 newPh
                             pokeByteOff (base `plusPtr` (slot * 32)) 8  newA
                             pokeByteOff (base `plusPtr` (slot * 32)) 24 (Decay newD c)
@@ -206,6 +191,13 @@ renderCallback vp sr nFrames outPtr gainRef reverbRef algRef smpRef ampSmoothRef
     when (defStereoWidth > 0) $
         widenR widthRef totalSamples outPtr
 
+    -- 5b. DC blocker before the reverbs: the piano voice's tanh stage emits a
+    --     real DC offset (asymmetric harmonic distribution → E[tanh(x)] ≠ 0)
+    --     which the reverb DC gains (comb ~12 × allpass ~13 × IR sum ~27)
+    --     would amplify into an audible offset / sub-bass drift.  First-order
+    --     high-pass, R ≈ 0.9995 @96k → −3 dB ≈ 2.4 Hz.
+    dcBlockBuffer dcRef totalSamples outPtr
+
     -- 6. Algorithmic reverb (Freeverb) — tweakable space enhancer
     processAlgReverb algRef nFrames outPtr
 
@@ -216,6 +208,25 @@ renderCallback vp sr nFrames outPtr gainRef reverbRef algRef smpRef ampSmoothRef
     compressBuffer outPtr totalSamples sr gainRef
   where
     totalSamples = nFrames * 2
+
+-- | First-order DC-blocking high-pass on both channels:
+--   y[n] = x[n] − x[n−1] + R·y[n−1].  State (prev input, prev output) per
+--   channel persists across blocks in @stRef@.
+dcBlockBuffer :: IORef (Double, Double, Double, Double) -> Int -> Ptr CFloat -> IO ()
+dcBlockBuffer stRef totalSamples outPtr = do
+    (xl, yl, xr, yr) <- readIORef stRef
+    let r = 0.9995
+        go !i !xp !yp !xq !yq
+            | i >= totalSamples = writeIORef stRef (xp, yp, xq, yq)
+            | otherwise = do
+                xL <- peekElemOff outPtr i
+                xR <- peekElemOff outPtr (i + 1)
+                let yL = realToFrac xL - xp + r * yp
+                    yR = realToFrac xR - xq + r * yq
+                pokeElemOff outPtr i     (realToFrac yL)
+                pokeElemOff outPtr (i + 1) (realToFrac yR)
+                go (i + 2) (realToFrac xL) yL (realToFrac xR) yR
+    go 0 xl yl xr yr
 
 -- | First-order allpass on the R channel only: y = a·x + x1 − a·y1.
 --   State (prev input, prev output) persists across blocks in @stRef@.

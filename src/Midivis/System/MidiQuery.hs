@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 module Midivis.System.MidiQuery where
 
@@ -15,6 +16,7 @@ import Midivis.Midi.MidiParser
 import Midivis.Midi.MidiEventType
 import Midivis.World
 import Control.Concurrent.STM (writeTQueue, atomically)
+import Control.Exception (try, SomeException)
 import System.IO (hPutStrLn, stderr)
 
 
@@ -32,25 +34,40 @@ clearMidiBuffer :: World -> IO World
 clearMidiBuffer w0 = return w0 {midiEvtBuf = mempty}
 
 
--- | Initialize midi, don't block thread
-initMidi :: IO (InputDevice)
-initMidi  = do
-    i <- defaultInput
-    openPort i 0 "Midivis"
-    return (i)
+-- | Initialize midi, don't block thread.
+--   Returns Nothing (with a warning) when no MIDI input device is present —
+--   the app must keep running, because the computer keyboard is a MIDI
+--   source too (see EventHandler).  Never throws.
+initMidi :: IO (Maybe InputDevice)
+initMidi = do
+    r <- try $ do
+        i <- defaultInput
+        openPort i 0 "Midivis"
+        return i
+    case r of
+        Left (e :: SomeException) -> do
+            hPutStrLn stderr $ "[Midi] No MIDI input device (computer keyboard only): " ++ show e
+            return Nothing
+        Right i -> return (Just i)
 
--- | Fill in MidiEventBuffer with MidiEvent(s), also avoid thread blocking operations
-bufferMidi :: InputDevice -> World -> IO World
-bufferMidi inputDevice w0 = do
-    --The delta::Double in getMessage's return tuple represents
-    -- the time elapsed in seconds since the previous MIDI message was received.
-    (delta, msg) <- getMessageSized inputDevice 32
-    --when queue is empty, delta == 0.0 and msg is empty vector
-    --not using callback so there's no warning and empty return
-    let mEvt = parse msg
-    case mEvt of
-        Nothing -> return w0 -- suppresse
-        Just e  -> appendMidiEvent e w0
+-- | Fill in MidiEventBuffer with MidiEvent(s), also avoid thread blocking operations.
+--   Nothing device (none present, or dropped after a read error) is a no-op.
+bufferMidi :: Maybe InputDevice -> World -> IO World
+bufferMidi Nothing w0 = return w0
+bufferMidi (Just inputDevice) w0 = do
+    r <- try $ getMessageSized inputDevice 32
+    case r of
+        Left (e :: SomeException) -> do
+            -- device unplugged / dead mid-session: drop it instead of
+            -- crashing the 1 kHz frame loop
+            hPutStrLn stderr $ "[Midi] read error (dropping device): " ++ show e
+            return w0
+        Right (_, msg) ->
+            --when queue is empty, delta == 0.0 and msg is empty vector
+            --not using callback so there's no warning and empty return
+            case parse msg of
+                Nothing -> return w0 -- suppresse
+                Just e  -> appendMidiEvent e w0
 
 -- | Clean up MidiEventBuffer, also avoid thread blocking operations and speed-up calculations
 --   Runs every frame (1 kHz).  Sorts events by noteId, pairs NoteOffs against
@@ -71,30 +88,42 @@ cleanBuffer w0 = do
                 noteOffs = sortBy valueL $ V.filter (\e -> evt e == NoteOff) buf
                 notePpA  = V.filter (\e -> evt e == PolyphonicAftertouch) buf
                 notePB   = V.filter (\e -> evt e == PitchBendChange) buf
-            -- MiniLab 3's Shift+Control triggers this benignly; just skip the frame
-            if V.length noteOns < V.length noteOffs
-                then do
-                    hPutStrLn stderr "[Midi] Warning: discarding unbalanced frame (NoteOn < NoteOff)"
-                    return w0{midiEvtBuf = mempty}
-                else do
-                    -- 2. pair NoteOffs with held NoteOns, keep aftertouch/PB
-                    --    only for notes that are actually sounding
-                    let processedOns = filterSortedByKey valueL noteOffs noteOns
-                        processedPpA = takeSameIdWith valueL processedOns notePpA
-                        processedPB  = takeSameIdWith valueL processedOns notePB
-                        processedAll = V.force $ processedOns V.++ processedPpA V.++ processedPB
-                        sv = copyElements processedAll
-                    -- 3. ship to the engine (it blocks on this queue)
-                    sv `seq` atomically $ writeTQueue (midiEvtQue w0) sv
-                    -- Keep only the active NoteOns in the buffer for the next
-                    -- frame's held-note matching.  Aftertouch/PB are consumed
-                    -- here (sent to the queue) and dropped — otherwise they
-                    -- would accumulate forever while a key is held, growing
-                    -- the per-frame work linearly and causing audio dropouts.
-                    return w0{
-                        midiEvtBuf = pack $ processedOns,
-                        midiEvtCpy = sv
-                    }
+                -- CC is a global control bus: forward every change as-is,
+                -- no note pairing, no filtering
+                noteCC   = V.filter (\e -> evt e == ControlOrModeChange) buf
+            -- MiniLab 3's Shift+Control (and some controllers' startup dumps
+            -- / arpeggiators) can emit more NoteOffs than NoteOns inside one
+            -- 1 ms frame — "ghost" NoteOffs with no matching held NoteOn.
+            -- Previously this discarded the WHOLE frame (midiEvtBuf = mempty),
+            -- which also destroyed the held-NoteOn state of every other
+            -- pressed key → the engine released all voices and the keyboard
+            -- stayed silent until the keys were re-pressed.  Fix: drop only
+            -- the surplus ghost NoteOffs and keep processing normally.
+            if V.length noteOffs > V.length noteOns
+                then hPutStrLn stderr $ "[Midi] dropping "
+                    ++ show (V.length noteOffs - V.length noteOns)
+                    ++ " ghost NoteOff(s) (no matching held NoteOn)"
+                else return ()
+            -- 2. pair NoteOffs with held NoteOns, keep aftertouch/PB
+            --    only for notes that are actually sounding; CC passes
+            --    through untouched (appended last)
+            let noteOffs'   = takeSameIdWith valueL noteOns noteOffs
+                processedOns = filterSortedByKey valueL noteOffs' noteOns
+                processedPpA = takeSameIdWith valueL processedOns notePpA
+                processedPB  = takeSameIdWith valueL processedOns notePB
+                processedAll = V.force $ processedOns V.++ processedPpA V.++ processedPB V.++ noteCC
+                sv = copyElements processedAll
+            -- 3. ship to the engine (it blocks on this queue)
+            sv `seq` atomically $ writeTQueue (midiEvtQue w0) sv
+            -- Keep only the active NoteOns in the buffer for the next
+            -- frame's held-note matching.  Aftertouch/PB are consumed
+            -- here (sent to the queue) and dropped — otherwise they
+            -- would accumulate forever while a key is held, growing
+            -- the per-frame work linearly and causing audio dropouts.
+            return w0{
+                midiEvtBuf = pack $ processedOns,
+                midiEvtCpy = sv
+            }
         
 
 copyElements :: (V.Storable a ) => V.Vector a -> SV.Vector a
