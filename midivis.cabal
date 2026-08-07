@@ -76,8 +76,10 @@ library
                         Midivis.Midi.MidiEventType,
                         Midivis.Tuning.TuningParser,
                         Midivis.Tuning.Scala,
+                        Midivis.Tuning.Ascl,
                         Midivis.Resources.Tuning.All,
                         Midivis.Resources.Audio.IR,
+                        Midivis.Resources.Font,
                         Midivis.Synth.Engine,
                         Midivis.Synth.Types,
                         Midivis.Synth.Smooth,
@@ -85,16 +87,25 @@ library
                         Midivis.Synth.Fft,
                         Midivis.Synth.ConvReverb,
                         Midivis.Synth.AlgorithmicReverb,
-                        Midivis.Synth.WavLoader
-
-    -- sorry but keep it ascii
-    other-modules:      Midivis.Resources.Tuning.Default,
+                        Midivis.Synth.WavLoader,
+                        Midivis.Synth.CtrlBus,
+                        Midivis.Synth.Preset,
+                        Midivis.Render.Text,
+                        Midivis.Resources.Tuning.Default,
                         Midivis.Resources.Tuning.EDO,
                         Midivis.Resources.Tuning.JustIntonation,
                         Midivis.Resources.Tuning.Dastgah,
+                        Midivis.Resources.Tuning.Extra,
                         Midivis.Util.THUtils,
                         Midivis.Util.Math,
-                        Midivis.Synth.VoicePool
+
+    -- sorry but keep it ascii
+    other-modules:      
+                        
+                        Midivis.Util.Text,
+                        Midivis.Synth.VoicePool,
+                        Midivis.Synth.KeyboardLayout,
+                        Midivis.Resources.FontTH
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -104,6 +115,7 @@ library
     build-depends:    base ^>=4.20.1.0,
                       array,
                       gloss-relative,
+                      gloss,
                       random,
                       linear,
                       vector,
@@ -117,6 +129,7 @@ library
                       unordered-containers,
                       hashable,
                       vector-algorithms,
+                      with-utf8,
                       -- audio processing
                       RtMidi,
                       storablevector, 
@@ -125,7 +138,10 @@ library
                       synthesizer-core,
                       synthesizer-midi,
                       -- concurrent needs
-                      stm^>=2.5.3.1
+                      stm^>=2.5.3.1,
+                      -- utf-8 text rendering
+                      freetype2,
+                      containers
 
 
     -- Directories containing source files.
@@ -162,7 +178,8 @@ executable midivis
                       stm ^>=2.5.3.1,
                       storablevector,
                       directory,
-                      array
+                      array,
+                      with-utf8
 
     -- Directories containing source files.
     hs-source-dirs:   app
@@ -195,4 +212,7 @@ test-suite midivis-test
     -- Test dependencies.
     build-depends:
                       base ^>=4.20.1.0,
-                      midivis
+                      midivis,
+                      stm ^>=2.5.3.1,
+                      vector,
+                      gloss-relative
