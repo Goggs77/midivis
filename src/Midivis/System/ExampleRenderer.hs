@@ -6,9 +6,11 @@ import Midivis.World
 import Midivis.Util.Math
 
 import Graphics.Gloss.Relative
+import Graphics.Gloss.Interface.Environment
 import Sound.RtMidi (InputDevice)
 import Control.Concurrent.STM
-import Midivis.Tuning.Scala
+import qualified Data.StorableVector as SV
+import Midivis.Tuning.Ascl (calibrateA4, hasReferencePitch)
 import Midivis.Resources.Tuning.All
 
 
@@ -18,9 +20,14 @@ drawExampleRelative :: TVar World -> IO ()
 drawExampleRelative w0TVar = do
     inputDevice <- initMidi
     w0 <- readWorld w0TVar
-    putStrLn "[Debug] Midi Initialized"
+    (_, h) <- getScreenSize
+    -- 1151 and 809 are primes for no special reason, keep it that way
+    let size = (round (1151.0 * ratio), round (809.0 * ratio)) where ratio = fromIntegral h/1080.0
+    case inputDevice of
+        Nothing -> putStrLn "[Debug] No MIDI keyboard — computer keyboard active"
+        Just _  -> putStrLn "[Debug] Midi Initialized"
     playRelativeIO
-        (InWindow "Midivis" (1151,809) (100,100))
+        (InWindow "Midivis" size (300,100))
         black
         1000 -- poll per 1 ms (1KHz)
         w0
@@ -42,7 +49,8 @@ stepTime dT w0 =
 stepAngle :: World -> IO World
 stepAngle w0 = if isFixedFrame w0 then return w0{
     bufferVelocity = lerp (bufferVelocity w0) (clockVelocity w0 /(0.3+1.5*(fromIntegral (midiLength w0) - 0.1) )) 0.02,
-    baseAngle = baseAngle w0 + bufferVelocity w0
+    baseAngle = baseAngle w0 + bufferVelocity w0,
+    bufferTransparency = lerp (bufferTransparency w0) (fromIntegral (SV.length $ midiEvtCpy w0) / 77.0) 0.01
     } 
     else return w0
 
@@ -54,13 +62,20 @@ stepTuning w0 = if totalFrames w0 `rem` 90 == 0 && tuningScroll w0 /= Stop
                 Stop -> 0
                 Prev -> (-1)
             newIndex = (sclIndex w0 + (length allTunings + i)) `rem` (length allTunings)
+            tun = allTunings !! newIndex
+            -- Prefer the file's own @ABL REFERENCE_PITCH (parseAscl already
+            -- applied it at compile time); fall back to A4 = freqA4 when the
+            -- file declares none.
+            chosen = if hasReferencePitch tun
+                        then tun
+                        else calibrateA4 tun (freqA4 w0)
         return w0 {
         sclIndex = newIndex,
-        sclOfChoice = calibrateA4 (allTunings !! newIndex) (freqA4 w0)
+        sclOfChoice = chosen
         }
     else return w0
 
-step :: TVar World -> InputDevice -> Float -> World -> IO World
+step :: TVar World -> Maybe InputDevice -> Float -> World -> IO World
 step w0TVar inputDevice dT w0 = do
     stepTime dT w0
     >>= stepAngle
