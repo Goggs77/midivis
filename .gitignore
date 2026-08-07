@@ -60,3 +60,5 @@ drafts/
 
 # Generated project files
 dist-newstyle/
+newerGlossRelative/gloss-relative
+### we have to modify gloss-relative-0.2.0.0 and some how vscode's sc identified this directory as a file
