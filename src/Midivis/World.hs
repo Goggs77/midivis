@@ -22,7 +22,9 @@ import Control.Concurrent.STM.TQueue
 import Midivis.Midi.MidiParser (MidiEvent)
 import Midivis.Resources.Tuning.All
 import Midivis.Tuning.TuningParser
-import Midivis.Tuning.Scala
+import Midivis.Tuning.Ascl (Ascl, calibrateA4)
+import Midivis.Synth.VoicePool (VoicePool, newVoicePool)
+import Midivis.Synth.CtrlBus (CtrlBus, newCtrlBus)
 
 newtype MidiEventBuffer = MidiEventBuffer (Vector MidiEvent) 
 instance Show MidiEventBuffer where show (MidiEventBuffer buf) = show $ V.toList buf
@@ -43,6 +45,7 @@ data World =  World
         baseAngle :: !Double,
         clockVelocity :: !Double, 
         bufferVelocity :: !Double,
+        bufferTransparency :: !Double,
         -- midi and tuning
         midiEvtBuf :: !MidiEventBuffer,
         midiEvtCpy :: SV.Vector MidiEvent,
@@ -50,11 +53,23 @@ data World =  World
         sclIndex :: !Int,
         freqA4 :: !Double,
         tuningScroll :: TuningScroll,
-        sclOfChoice :: !Scala
+        sclOfChoice :: !Ascl,
+        keyboardShift :: !Int,
+        -- runtime synth resources (created once at initWorld; the engine and
+        -- the audio callback hold the same references)
+        voicePool :: !VoicePool,
+        ctrlBus :: !CtrlBus
     }
 
-initWorld :: TQueue (SVB.Vector MidiEvent) -> World
-initWorld tq = World {
+-- | Create the full world state, including the runtime synth resources
+--   (VoicePool + CtrlBus).  The engine thread reads them back from the TVar;
+--   the PortAudio callback captures the same references at startup (the
+--   real-time thread must never touch STM).
+initWorld :: TQueue (SVB.Vector MidiEvent) -> IO World
+initWorld tq = do
+    vp <- newVoicePool
+    bus <- newCtrlBus
+    return World {
     -- timing
     time = 0.0, 
     totalFrames = 0,
@@ -64,14 +79,19 @@ initWorld tq = World {
     baseAngle = 0.0, 
     clockVelocity = pi / 288 / 1.5,
     bufferVelocity = 0,
+    bufferTransparency = 0,
     -- midi and tuning
-    midiEvtBuf = mempty, 
-      --midiEvtCpy = , just leave it, we'll update it once we have updated midi thread
+    midiEvtBuf = mempty,
+    midiEvtCpy = SV.empty,
     midiEvtQue = tq,
-    sclIndex = 6,
+    sclIndex = 9,
     freqA4 = 440,
     tuningScroll = Stop,
-    sclOfChoice = calibrateA4 (edo12) 440
+    sclOfChoice = calibrateA4 (edo12) 440,
+    keyboardShift = 0,
+    -- synth
+    voicePool = vp,
+    ctrlBus = bus
     }
 
 -- | Writes the World atomically
