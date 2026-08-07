@@ -28,6 +28,9 @@ scaleNumLog inf1 sup1 inf2 sup2 = map (\x -> (sup2 - inf2)*(log x - log inf1)/(l
 scaleNumLog2 :: Double -> Double -> Double -> Double -> [Double] -> [Double]
 scaleNumLog2 inf1 sup1 inf2 sup2 = map (\x -> (sup2 - inf2)*(log2 x - log2 inf1)/(log2 sup1 - log2 inf1) + inf2)
 
+scaleLog2 :: Double -> Double -> Double -> Double -> Double -> Double
+scaleLog2 inf1 sup1 inf2 sup2 = (\x -> (sup2 - inf2)*(log2 x - log2 inf1)/(log2 sup1 - log2 inf1) + inf2)
+
 scaleNumLog10 :: Double -> Double -> Double -> Double -> [Double] -> [Double]
 scaleNumLog10 inf1 sup1 inf2 sup2 = map (\x -> (sup2 - inf2)*(logBase 10 x - logBase 10 inf1)/(logBase 10 sup1 - logBase 10 inf1) + inf2) 
 
