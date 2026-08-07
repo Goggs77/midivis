@@ -69,7 +69,13 @@ newConvReverb :: Int -> [Double] -> Double -> Double -> Double -> IO ConvReverb
 newConvReverb n ir0 dry wet gain = do
     -- 1. Truncate the IR tail to keep the multiply-accumulate load bounded
     --    (total MAC load = 2·IR·sr/N, so tail length is a direct cost).
-    let ir      = take (round (defConvMaxTail * defSampleRate)) ir0
+    let ir0'    = take (round (defConvMaxTail * defSampleRate)) ir0
+        -- DC removal: a real IR should be zero-mean.  Removing the mean
+        -- zeroes the convolution's DC gain (Σ IR), so any residual DC in
+        -- the input (e.g. the voice's tanh offset) is no longer amplified
+        -- by the IR's DC sum.
+        irMean  = sum ir0' / fromIntegral (length ir0')
+        ir      = map (\x -> x - irMean) ir0'
         irLen   = length ir
         p       = max 1 ((irLen + n - 1) `div` n)
         fftn    = 2 * n
@@ -172,7 +178,7 @@ syntheticIR :: Int -> Double -> [Double]
 syntheticIR len t60 =
     let g = mkStdGen 42
         noises = randomRs (-1.0, 1.0) g
-        sr = 96000.0
+        sr = defSampleRate
     in [ x * exp (-3.0 * fromIntegral k / (t60 * sr))
        | (k, x) <- zip [0 .. len - 1] noises ]
 
