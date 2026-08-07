@@ -1,0 +1,72 @@
+# Charset for the supplementary font (NotoSerifSC-Regular).
+# Each non-comment, non-blank line specifies ONE character to render
+# from the supplementary font, in addition to all glyphs of the primary
+# font (GoogleSans-Regular).
+#
+# This file is read at compile time by Midivis.Resources.FontTH.
+# Lines starting with '#' are ignored.  A line may contain exactly one
+# character; trailing whitespace and comments are allowed after it.
+#
+# To add a character: put it on its own line, e.g.
+#   中
+# then rebuild.  (UTF-8 encoding, no BOM.)
+
+# Music accidentals (not present in GoogleSans)
+♭
+♮
+♯
+
+# Math / units symbols
+−
+⁻
+⊙
+±
+×
+÷
+≈
+≤
+→
+←
+↔
+·
+…
+★
+¹
+Σ
+₀
+₁
+₂
+₃
+₄
+₅
+₆
+₇
+₈
+₉
+₊
+₋
+₍
+₎
+ₑ
+
+
+# Latin extended (present in GoogleSans too, harmless to duplicate)
+ā
+Ā
+š
+Š
+
+
+
+# CJK placeholder — uncomment lines below to render specific hanzi.
+#中
+#文
+#界
+#面
+#调
+#音
+#名
+
+# Blanks
+　
+# EOF
