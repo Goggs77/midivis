@@ -9,7 +9,7 @@ import Midivis.World
 import Midivis.EventHandler
 import Midivis.System.MidiQuery (bufferMidi, initMidi)
 import Midivis.Midi.MidiParser (MidiEvent(..))
-import Midivis.Midi.MidiEventType (MidiEventType(..))
+import Midivis.Midi.MidiEventType (MidiEventType(NoteOn, NoteOff))
 
 -- gloss-relative EventKey 是记录: EventKey { eventKey, eventKeyState, eventModifiers, eventMouse }
 keyEv :: Key -> KeyState -> Event
@@ -81,6 +81,34 @@ main = do
     if V.length (unpack (midiEvtBuf w4)) == 2
         then pure ()
         else error "unmapped key should not add events"
+
+    -- 5. Backspace 清空所有 NoteOn（两条后端路径: GLUT Char '\8' / GLFW KeyBackspace）
+    b1 <- handleEvent (keyEv (Char '\8') Down) w4
+    if V.null (unpack (midiEvtBuf b1))
+        then pure ()
+        else error "Backspace (Char 8) should clear all held NoteOns"
+    b2 <- handleEvent (keyEv (Char 'z') Down) b1
+    if V.length (unpack (midiEvtBuf b2)) == 1
+        then pure ()
+        else error "re-press after backspace should work"
+    b3 <- handleEvent (keyEv (SpecialKey KeyBackspace) Down) b2
+    if V.null (unpack (midiEvtBuf b3))
+        then pure ()
+        else error "Backspace (KeyBackspace) should clear all held NoteOns"
+
+    -- 6. Preset switching: ',' = Prev, '.' = Next (scroll), Up = Stop
+    p1 <- handleEvent (keyEv (Char ',') Down) b3
+    if presetScroll p1 == Prev
+        then pure ()
+        else error "Down ',' should scroll preset Prev"
+    p2 <- handleEvent (keyEv (Char '.') Down) b3
+    if presetScroll p2 == Next
+        then pure ()
+        else error "Down '.' should scroll preset Next"
+    p3 <- handleEvent (keyEv (Char '.') Up) p2
+    if presetScroll p3 == Stop
+        then pure ()
+        else error "Up '.' should stop preset scroll"
 
     -- === MIDI 设备缺失降级验证 ===
     -- 1. bufferMidi Nothing 是 no-op（无设备时不崩、不改 World）

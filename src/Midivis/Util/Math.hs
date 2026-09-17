@@ -1,5 +1,9 @@
 module Midivis.Util.Math where
 import Graphics.Gloss.Relative
+import Data.Fixed (mod')
+import Data.Bits
+import Data.Word
+import GHC.Float (castDoubleToWord64)
 
 ln2 :: Double
 ln2 = 0.6931471805599453
@@ -62,3 +66,58 @@ zeroRelative = (Relative 0, Relative 0)
 
 tf21 :: (a -> b -> c -> d) -> (b -> a -> c -> d)
 tf21 f b a = f a b
+
+fromIntegralPoint :: (Integral a, Num b) => (a, a) -> (b, b)
+fromIntegralPoint (x, y) = (fromIntegral x, fromIntegral y)
+
+-- | Converts an interval to frequency ratio, using 12TET. It's inverse is @to12TET@
+from12TET :: Double -> Double
+from12TET interval = 2.0 ** (interval / 12.0)
+
+-- | The inverse function of @from12TET@
+to12TET :: Double -> Double
+to12TET ratio = 12.0 * log2 ratio
+
+infix 4 <->
+(<->) :: [a -> b] -> [a] -> [b]
+_ <-> [] = []
+[] <-> _ = []
+f:fs <-> x:xs = f x : (fs <-> xs)
+
+-- | Use radian for h
+hsv2rgb :: Double -> Double -> Double -> Color
+hsv2rgb h s v = 
+    let
+        c = s*v
+        h' = h*3.0/pi
+        x = c*(1 - abs ((h' `mod'` 2) - 1))
+        m = v - c
+        (r, g, b) = case h' of
+            n | 0 <= n && n < 1 -> forT3 (c, x, 0) (+m)
+            n | 1 <= n && n < 2 -> forT3 (x, c, 0) (+m)
+            n | 2 <= n && n < 3 -> forT3 (0, c, x) (+m)
+            n | 3 <= n && n < 4 -> forT3 (0, x, c) (+m)
+            n | 4 <= n && n < 5 -> forT3 (x, 0, c) (+m)
+            n | 5 <= n && n < 6 -> forT3 (c, 0, x) (+m)
+            _ -> forT3 (c, x, 0) (+m)
+    in makeColor (realToFrac r) (realToFrac g) (realToFrac b) 0.95
+
+
+forT3 :: (Double, Double, Double) -> (Double -> Double) -> (Double, Double, Double)
+forT3 (a, b, c) f = (f a, f b, f c)
+
+uncurry4 :: (a -> b -> c -> d -> e) -> (a, b, c, d) -> e
+uncurry4 f (a, b, c, d) = f a b c d
+
+-- | LCG normalized to (-0.01, +0.01)
+detNoise :: Int -> Int -> Double
+detNoise s slot =
+  let h = (fromIntegral s * 2654435761 + fromIntegral (slot * 7919 + 17) * 40503) * 1103515245 :: Int
+      u = fromIntegral ((h `shiftR` 16) .&. 0xFFFFFF) :: Double
+   in (u / 8388607.5 - 1.0) * 0.01
+
+-- | bitwise cast Double to Int
+d2i :: Double -> Int
+d2i d = 
+    let b = fromIntegral (castDoubleToWord64 d) :: Word64
+    in fromIntegral (b .|. 0xFFFFFFFF)

@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 680 560" width="100%" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>midivis 效果器链节点图</title>
+<desc>renderVoices 合成后经 EQ、Chorus、widenR、Ensemble、DC 阻断、算法混响、卷积混响、压缩器的完整信号链，标注各环节源码参数。</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+<text x="40" y="26" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="500" fill="#2C2C2A">midivis 效果器链（src/Midivis/Synth/Render.hs）</text>
+
+<g>
+<rect x="40" y="40" width="210" height="120" rx="12" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="145" y="62" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="500" fill="#3C3489">renderVoices</text>
+<text x="145" y="80" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#534AB7">voice loop · 128 slots</text>
+<text x="50" y="98" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#26215C">s1/s2 cascade (epAmpSmoothK)</text>
+<text x="50" y="111" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#26215C">ampGain / freqMod / vibD'</text>
+<text x="50" y="124" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#26215C">lfoVals = smoothNoise</text>
+<text x="50" y="137" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#26215C">notelen = (t0-onset)/sr</text>
+<text x="50" y="150" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#26215C">advanceEnvAt ENV1/2/3</text>
+</g>
+
+<g>
+<rect x="260" y="40" width="180" height="26" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="268" y="53" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#444441">VoicePool (128×72B)</text>
+<rect x="460" y="40" width="180" height="26" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="468" y="53" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#444441">vSample (flute/piano)</text>
+<rect x="260" y="72" width="180" height="26" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="268" y="85" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#444441">vLfos → lfoVals</text>
+<rect x="460" y="72" width="180" height="26" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="468" y="85" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#444441">CtrlBus → ccSnap</text>
+<rect x="260" y="104" width="180" height="26" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="268" y="117" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#444441">vMatrix → ModRow</text>
+<rect x="460" y="104" width="180" height="26" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="468" y="117" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#444441">vEnv1/2/3 (EnvParams)</text>
+<rect x="260" y="136" width="180" height="26" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="268" y="149" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#444441">vNoteLen → noteLenAt</text>
+<rect x="460" y="136" width="180" height="26" rx="6" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="468" y="149" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="10" fill="#444441">vibRatio (fxVibDepth/Rate)</text>
+</g>
+
+<path d="M145 160 V 185 H 110 V 208" fill="none" stroke="#534AB7" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="40" y="210" width="140" height="110" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="110" y="232" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="500" fill="#085041">processEq</text>
+<text x="110" y="249" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#0F6E56">EqFx · 3-band biquad</text>
+<text x="50" y="266" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxEqLowGain (dB)</text>
+<text x="50" y="279" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxEqMidGain (dB)</text>
+<text x="50" y="292" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxEqHighGain (dB)</text>
+<text x="50" y="305" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxEqMidFreq (Hz)</text>
+<text x="50" y="318" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxEqMidQ</text>
+</g>
+
+<path d="M180 265 H 193" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="195" y="210" width="140" height="110" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="265" y="232" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="500" fill="#085041">processChorus</text>
+<text x="265" y="249" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#0F6E56">ChorusFx · 3 delay lines</text>
+<text x="205" y="266" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxChorusMix</text>
+<text x="205" y="279" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxChorusDepth (samp)</text>
+<text x="205" y="292" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxChorusRate (Hz)</text>
+<text x="205" y="305" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">bases 400/800/1200</text>
+<text x="205" y="318" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">tri LFO 0/0.33/0.66</text>
+</g>
+
+<path d="M335 265 H 348" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="350" y="210" width="140" height="110" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="420" y="232" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="500" fill="#085041">widenR</text>
+<text x="420" y="249" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#0F6E56">R-channel allpass</text>
+<text x="360" y="266" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxWiden (a)</text>
+<text x="360" y="279" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">sfWidthRef (aSm,x1,y1)</text>
+<text x="360" y="292" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">sfWidthTgt</text>
+</g>
+
+<path d="M490 265 H 503" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="505" y="210" width="135" height="110" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="572" y="232" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="500" fill="#085041">processEnsemble</text>
+<text x="572" y="249" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#0F6E56">EnsembleFx · L/R antiphase</text>
+<text x="515" y="266" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxEnsembleWidth</text>
+<text x="515" y="279" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">baseL 800 / baseR+w</text>
+<text x="515" y="292" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">±200 tri sweep</text>
+</g>
+
+<path d="M572 320 V 358 H 100 V 398" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="40" y="400" width="120" height="130" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="100" y="422" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="500" fill="#085041">dcBlockBuffer</text>
+<text x="100" y="439" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#0F6E56">1st-order HP</text>
+<text x="50" y="456" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">fxDcR (0.9995)</text>
+<text x="50" y="469" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">sfDcRTgt / sfDcRSm</text>
+<text x="50" y="482" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#04342C">sfDcRef (xl,yl,xr,yr)</text>
+</g>
+
+<path d="M160 465 H 173" fill="none" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="175" y="400" width="140" height="130" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text x="245" y="422" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="500" fill="#0C447C">processAlgReverb</text>
+<text x="245" y="439" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#185FA5">AlgReverb · 8 comb + 4 ap</text>
+<text x="185" y="456" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">rvAlg → apRoom</text>
+<text x="185" y="469" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">apDamp</text>
+<text x="185" y="482" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">apSpread</text>
+<text x="185" y="495" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">apPreDelay</text>
+<text x="185" y="508" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">apWet / apDry</text>
+<text x="185" y="521" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">setAlgParams / getAlgParams</text>
+</g>
+
+<path d="M315 465 H 328" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="330" y="400" width="130" height="130" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text x="395" y="422" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="500" fill="#0C447C">processReverb</text>
+<text x="395" y="439" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#185FA5">ConvReverb · partitioned</text>
+<text x="340" y="456" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">rvConvDry / rvConvWet</text>
+<text x="340" y="469" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">rvConvGain</text>
+<text x="340" y="482" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">crDry/crWet/crGain IORef</text>
+<text x="340" y="495" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">defConvBlockSize=1024</text>
+<text x="340" y="508" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">defConvSpectrumLimit</text>
+<text x="340" y="521" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#042C53">defConvPreDelay L/R</text>
+</g>
+
+<path d="M460 465 H 473" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="475" y="400" width="110" height="130" rx="10" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+<text x="530" y="422" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="500" fill="#633806">compressBuffer</text>
+<text x="530" y="439" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#854F0B">stereo-linked</text>
+<text x="485" y="456" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#412402">fxCompThr (dBFS)</text>
+<text x="485" y="469" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#412402">fxCompRatio</text>
+<text x="485" y="482" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#412402">fxCompAtk (s)</text>
+<text x="485" y="495" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#412402">fxCompRel (s)</text>
+<text x="485" y="508" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#412402">sfCompTgt / sfCompSm</text>
+<text x="485" y="521" font-family="'Cascadia Code', Consolas, monospace" font-size="9.5" fill="#412402">sfGainRef</text>
+</g>
+
+<path d="M585 465 H 598" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="600" y="400" width="40" height="130" rx="10" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+<text x="620" y="440" text-anchor="middle" dominant-baseline="central" font-family="'Segoe UI', Arial, sans-serif" font-size="12" font-weight="500" fill="#27500A">out</text>
+<text x="620" y="470" text-anchor="middle" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="8" fill="#3B6D11">outPtr</text>
+<text x="620" y="482" text-anchor="middle" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="8" fill="#3B6D11">CFloat</text>
+<text x="620" y="494" text-anchor="middle" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="8" fill="#3B6D11">stereo</text>
+<text x="620" y="506" text-anchor="middle" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="8" fill="#3B6D11">inter</text>
+<text x="620" y="518" text-anchor="middle" dominant-baseline="central" font-family="'Cascadia Code', Consolas, monospace" font-size="8" fill="#3B6D11">leaved</text>
+</g>
+
+<text x="40" y="548" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#5F5E5A">参数均为 Preset 字段（vFx / rvAlg / rvConv*），经 pushVoiceToFx 写入各 IORef 目标，处理函数块级平滑逼近</text>
+</svg>

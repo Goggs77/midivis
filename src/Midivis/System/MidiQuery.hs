@@ -15,7 +15,9 @@ import Sound.RtMidi
 import Midivis.Midi.MidiParser
 import Midivis.Midi.MidiEventType
 import Midivis.World
-import Control.Concurrent.STM (writeTQueue, atomically)
+import Control.Concurrent (threadDelay)
+import Control.Monad (forever)
+import Control.Concurrent.STM (TQueue, writeTQueue, tryReadTQueue, atomically)
 import Control.Exception (try, SomeException)
 import System.IO (hPutStrLn, stderr)
 
@@ -50,24 +52,38 @@ initMidi = do
             return Nothing
         Right i -> return (Just i)
 
--- | Fill in MidiEventBuffer with MidiEvent(s), also avoid thread blocking operations.
---   Nothing device (none present, or dropped after a read error) is a no-op.
-bufferMidi :: Maybe InputDevice -> World -> IO World
-bufferMidi Nothing w0 = return w0
-bufferMidi (Just inputDevice) w0 = do
+-- | Standalone MIDI polling thread.  Runs outside the Gloss step chain so
+--   the simulation loop can drop to render rate (288) while MIDI stays at
+--   ~1 kHz.  Parsed events are pushed into a plain 'TQueue' (concurrency
+--   safe); the GUI thread drains it each tick via 'drainMidi', so the
+--   midiEvtBuf read-modify-write stays single-threaded (no lost updates /
+--   clobbering against the step chain's writeWorld').  A read error parks
+--   the thread (device unplugged mid-session); Nothing device is a no-op.
+midiPollThread :: Maybe InputDevice -> TQueue MidiEvent -> IO ()
+midiPollThread Nothing _ = return ()
+midiPollThread (Just inputDevice) pollQue = forever $ do
     r <- try $ getMessageSized inputDevice 32
     case r of
         Left (e :: SomeException) -> do
-            -- device unplugged / dead mid-session: drop it instead of
-            -- crashing the 1 kHz frame loop
-            hPutStrLn stderr $ "[Midi] read error (dropping device): " ++ show e
-            return w0
+            hPutStrLn stderr $ "[Midi] read error (stopping poll thread): " ++ show e
+            forever $ threadDelay maxBound
         Right (_, msg) ->
-            --when queue is empty, delta == 0.0 and msg is empty vector
-            --not using callback so there's no warning and empty return
+            -- when queue is empty, delta == 0.0 and msg is empty vector
+            -- not using callback so there's no warning and empty return
             case parse msg of
-                Nothing -> return w0 -- suppresse
-                Just e  -> appendMidiEvent e w0
+                Nothing -> return () -- suppresse
+                Just e  -> atomically $ writeTQueue pollQue e
+    threadDelay 1000   -- ~1 ms poll period (1 kHz), same latency as before
+
+-- | Pull every event the 'midiPollThread' queued since the last tick and
+--   append them to the World's MidiEventBuffer.  Runs on the GUI thread so
+--   the append stays a same-thread read-modify-write of midiEvtBuf.
+drainMidi :: TQueue MidiEvent -> World -> IO World
+drainMidi pollQue w0 = do
+    me <- atomically $ tryReadTQueue pollQue
+    case me of
+        Nothing -> return w0
+        Just e  -> drainMidi pollQue =<< appendMidiEvent e w0
 
 -- | Clean up MidiEventBuffer, also avoid thread blocking operations and speed-up calculations
 --   Runs every frame (1 kHz).  Sorts events by noteId, pairs NoteOffs against
@@ -81,7 +97,10 @@ cleanBuffer w0 = do
     -- (sorting / hashing / V.force / writeTQueue) which would otherwise
     -- allocate ~300B per frame at 1000 Hz even when nothing is happening.
     if V.null buf
-        then return w0
+        then do
+            let sv = copyElements buf -- push empty to reset states
+            sv `seq` atomically $ writeTQueue (midiEvtQue w0) sv
+            return w0
         else do
             -- 1. split by event type, NoteOns/NoteOffs sorted by noteId
             let noteOns  = sortBy valueL $ V.filter (\e -> evt e == NoteOn) buf
@@ -104,13 +123,18 @@ cleanBuffer w0 = do
                     ++ show (V.length noteOffs - V.length noteOns)
                     ++ " ghost NoteOff(s) (no matching held NoteOn)"
                 else return ()
-            -- 2. pair NoteOffs with held NoteOns, keep aftertouch/PB
-            --    only for notes that are actually sounding; CC passes
-            --    through untouched (appended last)
+            -- 2. pair NoteOffs with held NoteOns; keep per-note aftertouch
+            --    only for sounding notes.  PitchBend is CHANNEL-wide —
+            --    its valueL is the bend LSB, not a note id — so it must
+            --    NOT be paired against held NoteOns (that used to drop
+            --    nearly every bend event, including the release-to-centre
+            --    8192 whose LSB is 0, making bend feel delayed and never
+            --    return to centre).  Bend is absolute, so a frame's PBs
+            --    collapse to the last one.  CC passes through untouched.
             let noteOffs'   = takeSameIdWith valueL noteOns noteOffs
                 processedOns = filterSortedByKey valueL noteOffs' noteOns
                 processedPpA = takeSameIdWith valueL processedOns notePpA
-                processedPB  = takeSameIdWith valueL processedOns notePB
+                processedPB  = if V.null notePB then mempty else V.singleton (V.last notePB)
                 processedAll = V.force $ processedOns V.++ processedPpA V.++ processedPB V.++ noteCC
                 sv = copyElements processedAll
             -- 3. ship to the engine (it blocks on this queue)

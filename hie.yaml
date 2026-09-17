@@ -1,3 +1,7 @@
 cradle:
   cabal:
-    components: "exe:midivis"
+    - path: "./src/"
+      component: "lib:midivis"
+
+    - path: "./app/Main.hs"
+      component: "midivis:exe:midivis"

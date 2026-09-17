@@ -14,17 +14,18 @@ import Midivis.Resources.Tuning.Dastgah
 import Midivis.Resources.Tuning.Extra
 import Midivis.Tuning.Ascl ( Ascl )
 
--- | All tunings, ascending by notes-per-octave (音程数).
+-- | All tunings, ascending by notes-per-octave。
+--  All hail unicode
 allTunings :: [Ascl]
 allTunings =
     [ edo5                                   -- 5
     , dastgāh_e_Abuatā                       -- 6
     , edo7                                   -- 7
-    , dastgahNava                            -- 7
-    , dastgahShur                            -- 7
-    , wendyCarlosAlpha9                      -- 9
+    , dastgāh_e_Navā                            -- 7
+    , dastgāh_e_Šhur                            -- 7
+    , wendyCarlos_α9                      -- 9
     , edo11                                  -- 11
-    , wendyCarlosBeta11                      -- 11
+    , wendyCarlos_β11                      -- 11
     , edo12                                  -- 12
     , fiveSeven                              -- 12
     , quintal12                              -- 12
@@ -35,7 +36,7 @@ allTunings =
     , bohlenPierce13                         -- 13
     , bayati_Saba_Hijaz_Kurd_24EDO           -- 15
     , edo19                                  -- 19
-    , wendyCarlosGamma20                     -- 20
+    , wendyCarlos_γ20                     -- 20
     , edo22                                  -- 22
     , edo24                                  -- 24
     , helmholtz24                            -- 24

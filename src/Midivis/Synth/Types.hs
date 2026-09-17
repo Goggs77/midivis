@@ -117,21 +117,58 @@ instance Storable EnvelopeState where
 --------------------------------------------------------------------------------
 -- A single synthesizer voice
 --------------------------------------------------------------------------------
+-- | One 72-byte voice slot.  Fields are deliberately 8-byte aligned so every
+--   single-field write is atomic on x86_64 (no locks needed between the MIDI
+--   thread and the audio callback):
+--
+--     offset 0   vpFrequency   Double        MIDI thread writes
+--     offset 8   vpAmplitude   Double        synth thread writes
+--     offset 16  vpPhase       Double        synth thread writes
+--     offset 24  vpEnvelopeState EnvelopeState (Word64)  both (ENV1, volume)
+--     offset 32  vpEnv2State   EnvelopeState (Word64)    both (ENV2)
+--     offset 40  vpEnv2Amp     Double        synth thread (ENV2 output)
+--     offset 48  vpEnv3State   EnvelopeState (Word64)    both (ENV3)
+--     offset 56  vpEnv3Amp     Double        synth thread (ENV3 output)
+--     offset 64  vpOnset       Double        MIDI thread (global sample counter)
 data VoiceParams = VoiceParams
     { vpFrequency      :: !Double           -- (Hz)
     , vpAmplitude      :: !Double           -- [0,1]
     , vpPhase          :: !Double           -- phase accumulator
     , vpEnvelopeState  :: !EnvelopeState    -- packed into 8 bytes
+    , vpEnv2State      :: !EnvelopeState    -- ENV2 (mod source)
+    , vpEnv2Amp        :: !Double           -- ENV2 output [0,1]
+    , vpEnv3State      :: !EnvelopeState    -- ENV3 (mod source)
+    , vpEnv3Amp        :: !Double           -- ENV3 output [0,1]
+    , vpOnset          :: !Double           -- sample counter at NoteOn (notelen)
     }
 
+isReleasingOrIdle :: VoiceParams -> Bool
+isReleasingOrIdle vp = 
+    let env = vpEnvelopeState vp
+    in case env of
+        Release _ _ -> True
+        Idle -> True
+        _ -> False
+
+isIdle :: VoiceParams -> Bool
+isIdle vp = 
+    let env = vpEnvelopeState vp
+    in case env of
+        Idle -> True
+        _ -> False
 
 instance Show VoiceParams where
-    show (VoiceParams f a p e) =
-        padRight 80 ' ' $
+    show (VoiceParams f a p e e2 a2 e3 a3 o) =
+        padRight 140 ' ' $
             "Freq=" ++ fmtD 10 3 f ++
             " Amp=" ++ fmtD 7 3 a ++
             " Phase=" ++ fmtD 10 3 p ++
-            " Env=" ++ show e
+            " Env=" ++ show e ++
+            " Env2=" ++ show e2 ++
+            " Env2Amp=" ++ fmtD 7 3 a2 ++
+            " Env3=" ++ show e3 ++
+            " Env3Amp=" ++ fmtD 7 3 a3 ++
+            " Onset=" ++ fmtD 12 1 o
 
 
 
@@ -145,8 +182,8 @@ padRight :: Int -> Char -> String -> String
 padRight n ch s = take n (s ++ replicate n ch)
 
 instance Storable VoiceParams where
-    -- layout: Double(8) + Double(8) + Double(8) + EnvelopeState(8) = 32
-    sizeOf _    = 32
+    -- layout: Double(8) × 5 + EnvelopeState(8) × 3 = 72
+    sizeOf _    = 72
     alignment _ = 8
 
     peek ptr = VoiceParams
@@ -154,18 +191,28 @@ instance Storable VoiceParams where
         <*> peekByteOff ptr 8
         <*> peekByteOff ptr 16
         <*> peekByteOff ptr 24
+        <*> peekByteOff ptr 32
+        <*> peekByteOff ptr 40
+        <*> peekByteOff ptr 48
+        <*> peekByteOff ptr 56
+        <*> peekByteOff ptr 64
 
-    poke ptr (VoiceParams f a p e) = do
+    poke ptr (VoiceParams f a p e e2 a2 e3 a3 o) = do
         pokeByteOff ptr 0  f
         pokeByteOff ptr 8  a
         pokeByteOff ptr 16 p
         pokeByteOff ptr 24 e
+        pokeByteOff ptr 32 e2
+        pokeByteOff ptr 40 a2
+        pokeByteOff ptr 48 e3
+        pokeByteOff ptr 56 a3
+        pokeByteOff ptr 64 o
 
 defVoiceParams :: VoiceParams
-defVoiceParams = VoiceParams 0xFFFFFFFF 0 0 Idle
+defVoiceParams = VoiceParams 0xFFFFFFFF 0 0 Idle Idle 0 Idle 0 0
 
 defNormalizeAmp :: Double
-defNormalizeAmp = fromDBFS (-18.0)
+defNormalizeAmp = fromDBFS (-12.0)
 
 --------------------------------------------------------------------------------
 -- Convolution reverb parameters
@@ -181,7 +228,7 @@ defConvIRLen :: Int
 defConvIRLen = 192000                -- 2 s @ 96 kHz
 
 defConvIRT60 :: Double
-defConvIRT60 = 1.8                   -- seconds
+defConvIRT60 = 10.8                   -- seconds
 
 -- | Partition (block) size for the uniform partitioned convolution.
 --   Must be a power of two; latency = block / sampleRate (~11 ms @ 96 kHz).

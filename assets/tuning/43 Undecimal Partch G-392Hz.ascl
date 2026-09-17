@@ -1,6 +1,6 @@
 ! 43 Undecimal Partch G-392Hz.ascl
 !
-43-tone undecimal Rational Intonation scale by Harry Partch, consisting of 43 divisions per octave derived symmetrically from both harmonic and subharmonic series (otonalities and utonalities) up to a prime limit of 11. Partch’s original tuning was based on G (392 Hz), while this scala file uses the standard reference tone C. Therefore, each of Partch’s ratios have been multiplied by 3/2 and normalised, so that his original pitch-heights are retained. A is tuned to 441 Hz.
+43-tone undecimal Rational Intonation scale by Harry Partch, consisting of 43 divisions per octave derived symmetrically from both harmonic and subharmonic series (otonalities and utonalities) up to a prime limit of 11.
 !
 ! default tuning: degree 25 = 392 Hz .... Partch's original tuning, A = 441 Hz.
 !

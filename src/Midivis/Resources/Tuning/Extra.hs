@@ -24,9 +24,9 @@ $(makeAscl "EDO72" (parseAscl $(embedFileRelative "assets/tuning/72-EDO.ascl")))
 --------------------------------------------------------------------------------
 -- Non-octave equal divisions (Wendy Carlos alpha/beta/gamma, Bohlen-Pierce)
 --------------------------------------------------------------------------------
-$(makeAscl "WendyCarlosAlpha9" (parseAscl $(embedFileRelative "assets/tuning/9-ED3_2 Wendy Carlos alpha.ascl")))
-$(makeAscl "WendyCarlosBeta11" (parseAscl $(embedFileRelative "assets/tuning/11-ED3_2 Wendy Carlos beta.ascl")))
-$(makeAscl "WendyCarlosGamma20" (parseAscl $(embedFileRelative "assets/tuning/20-ED3_2 Wendy Carlos gamma.ascl")))
+$(makeAscl "WendyCarlos_α9" (parseAscl $(embedFileRelative "assets/tuning/9-ED3_2 Wendy Carlos alpha.ascl")))
+$(makeAscl "WendyCarlos_β11" (parseAscl $(embedFileRelative "assets/tuning/11-ED3_2 Wendy Carlos beta.ascl")))
+$(makeAscl "WendyCarlos_γ20" (parseAscl $(embedFileRelative "assets/tuning/20-ED3_2 Wendy Carlos gamma.ascl")))
 $(makeAscl "BohlenPierce13" (parseAscl $(embedFileRelative "assets/tuning/13-ED3 Bohlen Pierce.ascl")))
 
 --------------------------------------------------------------------------------
@@ -41,5 +41,5 @@ $(makeAscl "Partch43" (parseAscl $(embedFileRelative "assets/tuning/43 Undecimal
 --------------------------------------------------------------------------------
 $(makeAscl "Bayati1" (parseAscl $(embedFileRelative "assets/tuning/Bayati 1.ascl")))
 $(makeAscl "Rast1" (parseAscl $(embedFileRelative "assets/tuning/Rast 1 - Egypt mid 20th.ascl")))
-$(makeAscl "DastgahNava" (parseAscl $(embedFileRelative "assets/tuning/Dastgah-e Nava.ascl")))
-$(makeAscl "DastgahShur" (parseAscl $(embedFileRelative "assets/tuning/Dastgah-e Shur.ascl")))
+$(makeAscl "Dastgāh_e_Navā" (parseAscl $(embedFileRelative "assets/tuning/Dastgah-e Nava.ascl")))
+$(makeAscl "Dastgāh_e_Šhur" (parseAscl $(embedFileRelative "assets/tuning/Dastgah-e Shur.ascl")))

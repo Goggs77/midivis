@@ -12,6 +12,9 @@ module Midivis.Synth.ConvReverb
     ( ConvReverb
     , newConvReverb
     , syntheticIR
+    , setConvMix
+    , getConvMix
+    , limitSpectrum
     , processReverb
     ) where
 
@@ -48,18 +51,25 @@ data ConvState = ConvState
     }
 
 -- | The full reverb: shared IR spectra + one state per channel.
+--   The mix levels (dry/wet/gain) are live-modulatable: each has a target
+--   IORef (written by the modulation evaluator / preset switch) and a
+--   smoothed IORef that the per-block processing chases with a one-pole
+--   lerp — no zipper when a modulation target jumps.
 data ConvReverb = ConvReverb
-    { crN     :: !Int
-    , crFftN  :: !Int
-    , crP     :: !Int
-    , crPlan  :: FftPlan
-    , crIRRe  :: IOUArray Int Double      -- P×2N: IR partition spectra
-    , crIRIm  :: IOUArray Int Double
-    , crDry   :: !Double                  -- dry gain
-    , crWet   :: !Double                  -- wet gain
-    , crGain  :: !Double                  -- master output gain
-    , crL     :: ConvState
-    , crR     :: ConvState
+    { crN      :: !Int
+    , crFftN   :: !Int
+    , crP      :: !Int
+    , crPlan   :: FftPlan
+    , crIRRe   :: IOUArray Int Double      -- P×2N: IR partition spectra
+    , crIRIm   :: IOUArray Int Double
+    , crDry    :: IORef Double             -- dry gain target
+    , crWet    :: IORef Double             -- wet gain target
+    , crGain   :: IORef Double             -- master output gain target
+    , crDrySm  :: IORef Double             -- smoothed dry gain
+    , crWetSm  :: IORef Double             -- smoothed wet gain
+    , crGainSm :: IORef Double             -- smoothed master gain
+    , crL      :: ConvState
+    , crR      :: ConvState
     }
 
 -- | Build the reverb.  @ir@ is the mono impulse response (normalised here),
@@ -116,7 +126,15 @@ newConvReverb n ir0 dry wet gain = do
     --    dry/wet comb between channels.
     stL <- newConvState n p fftn (max 1 (round (defConvPreDelay  * defSampleRate)))
     stR <- newConvState n p fftn (max 1 (round (defConvPreDelayR * defSampleRate)))
-    return $ ConvReverb n fftn p plan irRe irIm dry wet gain stL stR
+    -- 5. Live-modulatable mix levels: target and smoothed both start at the
+    --    requested values, so behaviour is unchanged until a target is set.
+    dryRef  <- newIORef dry
+    wetRef  <- newIORef wet
+    gainRef <- newIORef gain
+    drySm   <- newIORef dry
+    wetSm   <- newIORef wet
+    gainSm  <- newIORef gain
+    return $ ConvReverb n fftn p plan irRe irIm dryRef wetRef gainRef drySm wetSm gainSm stL stR
 
 -- | Smallest power of two >= @n@.
 nextPow2 :: Int -> Int
@@ -182,17 +200,43 @@ syntheticIR len t60 =
     in [ x * exp (-3.0 * fromIntegral k / (t60 * sr))
        | (k, x) <- zip [0 .. len - 1] noises ]
 
+-- | Write new dry/wet/gain mix targets (preset switch / modulation
+--   evaluator).  The per-block processor smooths toward them.
+setConvMix :: ConvReverb -> Double -> Double -> Double -> IO ()
+setConvMix rev d w g = do
+    writeIORef (crDry rev) d
+    writeIORef (crWet rev) w
+    writeIORef (crGain rev) g
+
+-- | Read the current mix targets (modulation evaluator reads, adds amounts,
+--   writes back via 'setConvMix').
+getConvMix :: ConvReverb -> IO (Double, Double, Double)
+getConvMix rev = do
+    d <- readIORef (crDry rev)
+    w <- readIORef (crWet rev)
+    g <- readIORef (crGain rev)
+    return (d, w, g)
+
 -- | Process a stereo-interleaved CFloat buffer in place: wet convolution on
 --   both channels, then dry/wet mix scaled by the master gain.  The wet path
 --   goes through a short pre-delay ring so the dry transient is never
 --   cancelled by the wet tail (and the dry/wet comb is decorrelated per side).
+--   Mix targets are smoothed once per block (one-pole lerp, ~0.1/block) so a
+--   modulation target jump never zippers.
 processReverb :: IORef ConvReverb -> Int -> Ptr CFloat -> IO ()
 processReverb revRef nFrames outPtr = do
     rev <- readIORef revRef
-    let dry = crDry rev
-        wet = crWet rev
-        g   = crGain rev
-        stL = crL rev
+    -- one-pole chase of the modulated mix targets
+    let chase ref sm = do
+            t <- readIORef ref
+            s <- readIORef sm
+            let !s' = s + 0.1 * (t - s)
+            writeIORef sm s'
+            return s'
+    dry <- chase (crDry rev) (crDrySm rev)
+    wet <- chase (crWet rev) (crWetSm rev)
+    g   <- chase (crGain rev) (crGainSm rev)
+    let stL = crL rev
         stR = crR rev
     forM_ [0 .. nFrames - 1] $ \i -> do
         xL <- peekElemOff outPtr (i * 2)
@@ -206,8 +250,9 @@ processReverb revRef nFrames outPtr = do
         pokeElemOff outPtr (i * 2)     (realToFrac oL)
         pokeElemOff outPtr (i * 2 + 1) (realToFrac oR)
 
--- | Circular pre-delay: writes @y@ at the current position and reads back the
---   sample stored one ring-length ago (i.e. delayed by exactly the ring size).
+-- | Circular pre-delay: writes @y@ at the current position and reads back
+--   the sample written one ring-length ago (i.e. delayed by exactly the
+--   ring size).
 delaySample :: ConvState -> Double -> IO Double
 delaySample st y = do
     pos <- readIORef (csPrePos st)

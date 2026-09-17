@@ -48,7 +48,10 @@
 ₍
 ₎
 ₑ
-
+△
+⇥
+≐
+‰
 
 # Latin extended (present in GoogleSans too, harmless to duplicate)
 ā

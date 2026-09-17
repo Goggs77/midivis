@@ -2,7 +2,7 @@ module Midivis.EventHandler where
 import Graphics.Gloss.Relative
 
 import Midivis.World
-import Midivis.System.MidiQuery (appendMidiEvent)
+import Midivis.System.MidiQuery (appendMidiEvent, clearMidiBuffer)
 import Midivis.Midi.MidiParser (MidiEvent(..))
 import Midivis.Midi.MidiEventType (MidiEventType(NoteOn, NoteOff))
 
@@ -44,6 +44,25 @@ handleEvent (EventKey (Char '-') Up _ _) w0 = return w0 {
     tuningScroll = Stop
     }
 
+-- Preset switching: ',' previous / '.' next (scroll while held, like '='/'-'
+-- for tunings).  The engine and audio callback pick the new voice from the
+-- World on their next pass; the parameters are pushed by stepPreset.
+handleEvent (EventKey (Char ',') Down _ _) w0 = return w0 {
+    presetScroll = Prev
+    }
+
+handleEvent (EventKey (Char '.') Down _ _) w0 = return w0 {
+    presetScroll = Next
+    }
+
+handleEvent (EventKey (Char ',') Up _ _) w0 = return w0 {
+    presetScroll = Stop
+    }
+
+handleEvent (EventKey (Char '.') Up _ _) w0 = return w0 {
+    presetScroll = Stop
+    }
+
 -- 'Keyboard' here refers to keyboard for typing
 handleEvent (EventKey (Char '[') Down _ _) w0 = return w0 {
     keyboardShift = keyboardShift w0 - 1
@@ -52,6 +71,15 @@ handleEvent (EventKey (Char '[') Down _ _) w0 = return w0 {
 handleEvent (EventKey (Char ']') Down _ _) w0 = return w0 {
     keyboardShift = keyboardShift w0 + 1
     }
+
+-- Backspace = panic button: release every held note at once.
+--  Clearing midiEvtBuf makes the next cleanBuffer pass ship an empty frame,
+--  so the engine's Phase 2 releases every sounding voice (physical keys
+--  stay silent until released and re-pressed).
+--  This project's GLUT/freeglut backend reports Backspace as Char '\8';
+--  the GLFW backend reports SpecialKey KeyBackspace.  Handle both.
+handleEvent (EventKey (SpecialKey KeyBackspace) Down _ _) w0 = clearMidiBuffer w0
+handleEvent (EventKey (Char '\8') Down _ _) w0 = clearMidiBuffer w0
 
 -- Computer keyboard as a MIDI keyboard: key-down sends NoteOn (vel 100),
 -- key-up sends NoteOff.  appendMidiEvent drops the event into the shared

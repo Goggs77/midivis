@@ -17,6 +17,8 @@ module Midivis.Synth.AlgorithmicReverb
     , AlgReverb
     , defAlgParams
     , newAlgReverb
+    , setAlgParams
+    , getAlgParams
     , processAlgReverb
     ) where
 
@@ -94,6 +96,16 @@ newAlgReverb params = do
     stL <- newAlgChannel combDelaysL allpassDelays preLen
     stR <- newAlgChannel combDelaysR allpassDelays preLen
     return $ AlgReverb pRef sRef stL stR
+
+-- | Write new target parameters (preset switch / modulation evaluator).
+--   The per-block processor smooths toward them, so a jump glides.
+setAlgParams :: AlgReverb -> AlgParams -> IO ()
+setAlgParams rev p = writeIORef (arParams rev) p
+
+-- | Read the current target parameters (modulation evaluator reads, adds an
+--   amount, writes back via 'setAlgParams').
+getAlgParams :: AlgReverb -> IO AlgParams
+getAlgParams rev = readIORef (arParams rev)
 
 newAlgChannel :: [Int] -> [Int] -> Int -> IO AlgChannel
 newAlgChannel combLens apLens preLen = do

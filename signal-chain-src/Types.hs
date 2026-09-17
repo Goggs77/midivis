@@ -1,0 +1,370 @@
+{-# LANGUAGE LambdaCase #-}
+module Midivis.Synth.Types where
+
+import qualified Data.StorableVector.Base as SVB
+import qualified Data.StorableVector as SV
+import qualified Synthesizer.Storable.Oscillator as O
+import qualified Synthesizer.Basic.Phase as P
+import qualified Synthesizer.Basic.Wave as W
+import qualified Synthesizer.Storable.Signal as S
+import Midivis.Midi.MidiParser ( MidiEvent )
+import Midivis.Util.Math
+import Control.Concurrent.STM.TQueue
+import Control.Concurrent.STM
+import Foreign.Storable (Storable(..), peekByteOff, pokeByteOff)
+import Data.Bits (shiftL, shiftR, (.&.), (.|.))
+import Data.Word (Word32, Word64)
+import GHC.Float (castFloatToWord32, castWord32ToFloat)
+-- for debugging
+import Numeric (showFFloat)
+
+defPolyphony :: Int
+defPolyphony = 128
+
+defChunkSize :: S.ChunkSize
+defChunkSize = S.chunkSize 64
+
+defChunkSizeNum :: Double
+defChunkSizeNum = 64
+
+defSampleRate :: Double
+defSampleRate = 48000.0
+
+--------------------------------------------------------------------------------
+-- Duration scaling: [0,1] ↔ [0.001s, 60s] via log10 mapping
+--------------------------------------------------------------------------------
+minDur, maxDur :: Float
+minDur = 0.001
+maxDur = 60.0
+
+log10MinDur, log10DurRange :: Float
+log10MinDur = logBase 10 minDur     -- -3.0
+log10DurRange = logBase 10 maxDur - log10MinDur  -- ≈ 1.778 - (-3.0) = 4.778
+
+-- | [0,1] normalized → seconds, log10 mapped
+--   e.g. 0 → 0.001s (min), 0.5 → ~0.245s, 1 → 60s (max)
+scaleDuration :: Float -> Float
+scaleDuration n = 10 ** (log10MinDur + n * log10DurRange)
+
+-- | seconds → [0,1] normalized, log10 mapped
+unscaleDuration :: Float -> Float
+unscaleDuration d = (logBase 10 d - log10MinDur) / log10DurRange
+
+--------------------------------------------------------------------------------
+-- Envelope state: compressed into a single Word64 (8 bytes)
+--
+-- Bit layout of the Word64:
+--   bit 63-61: tag (3 bits, 0=Idle … 4=Release)
+--   bit 60-32: param1 (29 bits, unsigned), fraction of [0,1]
+--              Attack/Decay/Release → unscaleDuration⁻¹(duration)
+--              Sustain             → level [0,1]
+--   bit 31-0:  param2 (32 bits), raw Float bits (IEEE 754)
+--              Attack/Decay/Release → curve [0,1] (0=convex, 0.5=linear, 1=concave)
+--              Idle/Sustain         → 0
+--------------------------------------------------------------------------------
+data EnvelopeState
+    = Idle
+    | Attack  !Float !Float   -- (duration in seconds, curve [0,1])
+    | Decay   !Float !Float   -- (duration in seconds, curve [0,1])
+    | Sustain !Float          -- (level [0,1])
+    | Release !Float !Float   -- (duration in seconds, curve [0,1])
+    deriving (Eq)
+
+instance Show EnvelopeState where
+    show st = padRight 40 ' ' $ case st of
+        Idle           -> "Idle"
+        Attack d c     -> "Attack d=" ++ fmtF 8 3 d ++ " c=" ++ fmtF 4 3 c
+        Decay d c      -> "Decay  d=" ++ fmtF 8 3 d ++ " c=" ++ fmtF 4 3 c
+        Sustain l      -> "Sustain l=" ++ fmtF 6 3 l
+        Release d c    -> "Release d=" ++ fmtF 8 3 d ++ " c=" ++ fmtF 4 3 c
+
+instance Storable EnvelopeState where
+    -- layout: Word64(8)
+    sizeOf _    = 8
+    alignment _ = 8
+
+    peek ptr = do
+        w <- peekByteOff ptr 0 :: IO Word64
+        let tag         = (w `shiftR` 61) .&. 0x7
+            param1Frac  = fromIntegral ((w `shiftR` 32) .&. 0x1FFFFFFF) / max29 :: Float
+            param2      = castWord32ToFloat (fromIntegral (w .&. 0xFFFFFFFF) :: Word32)
+        case tag of
+            0 -> pure Idle
+            1 -> pure $ Attack  (scaleDuration param1Frac) param2
+            2 -> pure $ Decay   (scaleDuration param1Frac) param2
+            3 -> pure $ Sustain param1Frac   -- level is already [0,1]
+            4 -> pure $ Release (scaleDuration param1Frac) param2
+            _ -> pure Idle
+      where
+        max29 = 0x1FFFFFFF :: Float
+
+    poke ptr = \case
+        Idle           -> pokeByteOff ptr 0 (0 :: Word64)
+        Attack  d c    -> pokeEnc 1 (unscaleDuration d) (castFloatToWord32 c)
+        Decay   d c    -> pokeEnc 2 (unscaleDuration d) (castFloatToWord32 c)
+        Sustain l      -> pokeEnc 3 l 0
+        Release d c    -> pokeEnc 4 (unscaleDuration d) (castFloatToWord32 c)
+        where
+            pokeEnc :: Word64 -> Float -> Word32 -> IO ()
+            pokeEnc tag frac w32 =
+                pokeByteOff ptr 0 $
+                    (tag   `shiftL` 61)                .|.
+                    (p1Rnd `shiftL` 32)                .|.
+                    fromIntegral w32
+                where
+                    p1Rnd = fromIntegral (round (frac * 0x1FFFFFFF) :: Word64) .&. 0x1FFFFFFF
+
+--------------------------------------------------------------------------------
+-- A single synthesizer voice
+--------------------------------------------------------------------------------
+-- | One 72-byte voice slot.  Fields are deliberately 8-byte aligned so every
+--   single-field write is atomic on x86_64 (no locks needed between the MIDI
+--   thread and the audio callback):
+--
+--     offset 0   vpFrequency   Double        MIDI thread writes
+--     offset 8   vpAmplitude   Double        synth thread writes
+--     offset 16  vpPhase       Double        synth thread writes
+--     offset 24  vpEnvelopeState EnvelopeState (Word64)  both (ENV1, volume)
+--     offset 32  vpEnv2State   EnvelopeState (Word64)    both (ENV2)
+--     offset 40  vpEnv2Amp     Double        synth thread (ENV2 output)
+--     offset 48  vpEnv3State   EnvelopeState (Word64)    both (ENV3)
+--     offset 56  vpEnv3Amp     Double        synth thread (ENV3 output)
+--     offset 64  vpOnset       Double        MIDI thread (global sample counter)
+data VoiceParams = VoiceParams
+    { vpFrequency      :: !Double           -- (Hz)
+    , vpAmplitude      :: !Double           -- [0,1]
+    , vpPhase          :: !Double           -- phase accumulator
+    , vpEnvelopeState  :: !EnvelopeState    -- packed into 8 bytes
+    , vpEnv2State      :: !EnvelopeState    -- ENV2 (mod source)
+    , vpEnv2Amp        :: !Double           -- ENV2 output [0,1]
+    , vpEnv3State      :: !EnvelopeState    -- ENV3 (mod source)
+    , vpEnv3Amp        :: !Double           -- ENV3 output [0,1]
+    , vpOnset          :: !Double           -- sample counter at NoteOn (notelen)
+    }
+
+
+instance Show VoiceParams where
+    show (VoiceParams f a p e e2 a2 e3 a3 o) =
+        padRight 140 ' ' $
+            "Freq=" ++ fmtD 10 3 f ++
+            " Amp=" ++ fmtD 7 3 a ++
+            " Phase=" ++ fmtD 10 3 p ++
+            " Env=" ++ show e ++
+            " Env2=" ++ show e2 ++
+            " Env2Amp=" ++ fmtD 7 3 a2 ++
+            " Env3=" ++ show e3 ++
+            " Env3Amp=" ++ fmtD 7 3 a3 ++
+            " Onset=" ++ fmtD 12 1 o
+
+
+
+fmtF :: Int -> Int -> Float -> String
+fmtF _ d v = showFFloat (Just d) v ""
+
+fmtD :: Int -> Int -> Double -> String
+fmtD _ d v = showFFloat (Just d) v ""
+
+padRight :: Int -> Char -> String -> String
+padRight n ch s = take n (s ++ replicate n ch)
+
+instance Storable VoiceParams where
+    -- layout: Double(8) × 5 + EnvelopeState(8) × 3 = 72
+    sizeOf _    = 72
+    alignment _ = 8
+
+    peek ptr = VoiceParams
+        <$> peekByteOff ptr 0
+        <*> peekByteOff ptr 8
+        <*> peekByteOff ptr 16
+        <*> peekByteOff ptr 24
+        <*> peekByteOff ptr 32
+        <*> peekByteOff ptr 40
+        <*> peekByteOff ptr 48
+        <*> peekByteOff ptr 56
+        <*> peekByteOff ptr 64
+
+    poke ptr (VoiceParams f a p e e2 a2 e3 a3 o) = do
+        pokeByteOff ptr 0  f
+        pokeByteOff ptr 8  a
+        pokeByteOff ptr 16 p
+        pokeByteOff ptr 24 e
+        pokeByteOff ptr 32 e2
+        pokeByteOff ptr 40 a2
+        pokeByteOff ptr 48 e3
+        pokeByteOff ptr 56 a3
+        pokeByteOff ptr 64 o
+
+defVoiceParams :: VoiceParams
+defVoiceParams = VoiceParams 0xFFFFFFFF 0 0 Idle Idle 0 Idle 0 0
+
+defNormalizeAmp :: Double
+defNormalizeAmp = fromDBFS (-12.0)
+
+--------------------------------------------------------------------------------
+-- Convolution reverb parameters
+--------------------------------------------------------------------------------
+
+-- | Path to the mono impulse-response WAV (converted from assets/audio/IR).
+defConvIRPath :: FilePath
+defConvIRPath = "assets/audio/IR/ir.wav"
+
+-- | Fallback: if no IR file exists, use a synthetic decaying-noise IR of this
+--   length (samples) and T60 (seconds).
+defConvIRLen :: Int
+defConvIRLen = 192000                -- 2 s @ 96 kHz
+
+defConvIRT60 :: Double
+defConvIRT60 = 1.8                   -- seconds
+
+-- | Partition (block) size for the uniform partitioned convolution.
+--   Must be a power of two; latency = block / sampleRate (~11 ms @ 96 kHz).
+--   Note: total multiply-accumulate load = 2·IR·sr/N, so small blocks (e.g.
+--   512) are ~4x heavier than 2048 and exceed the real-time budget in pure
+--   Haskell, causing audio dropouts.  1024 with fpb=1024 keeps the per-block
+--   burst (2.5-5.5ms) well inside the 10.7ms callback budget.
+defConvBlockSize :: Int
+defConvBlockSize = 1024
+
+-- | Truncate the IR to this many seconds before convolving.  The reverb tail
+--   beyond this is discarded, cutting the per-block multiply-accumulate work
+--   proportionally (1.5 s of tail is plenty for most spaces).
+defConvMaxTail :: Double
+defConvMaxTail = 1.5                   -- seconds
+
+-- | Mix levels: dry is the unprocessed signal, wet the convolved tail.
+--   NOTE on level balance: the wet path is a linear convolution, so for a
+--   sustained single tone the wet output is the *same sine*, scaled by the IR
+--   spectrum |H(f)| and phase-shifted by phi(f).  The dry/wet mix is therefore
+--   a vector sum — where the IR spectrum peaks (>+10 dB) and the phase is
+--   inverted, the wet cancels the dry and that note sounds weak (e.g. F#4).
+--   A pre-delay decouples the transient (attacks are never cancelled) and
+--   randomises the comb; keeping wet < dry bounds the deepest cancellation.
+defConvDry :: Double
+defConvDry = 0.8
+
+defConvWet :: Double
+defConvWet = 0.35
+
+-- | Per-bin magnitude limit applied to the IR spectrum before convolution.
+--   A plain energy normalisation leaves spectral peaks at +12..+20 dB; with
+--   wet comparable to dry, those peaks cancel the dry signal at comb notches
+--   and whole notes sound weak (e.g. F#4 at 370 Hz).  Limiting each bin keeps
+--   wet·|H(f)| below dry so no note can be cancelled.
+defConvSpectrumLimit :: Double
+defConvSpectrumLimit = 1.246
+
+-- | Pre-delay applied to the wet path only (seconds).  Left/right differ
+--   slightly to decorrelate the dry/wet comb between channels.
+defConvPreDelay :: Double
+defConvPreDelay = 0.025
+
+defConvPreDelayR :: Double
+defConvPreDelayR = 0.030
+
+-- | Master gain applied after the dry/wet mix.
+defConvGain :: Double
+defConvGain = 1.2
+
+--------------------------------------------------------------------------------
+-- Algorithmic reverb (Freeverb) — pre-reverb before the convolution
+--------------------------------------------------------------------------------
+
+-- | Room size 0..1: maps to comb feedback (0.7 + 0.28·room) → tail length.
+defAlgRoomSize :: Double
+defAlgRoomSize = 0.8
+
+-- | Comb low-pass damping 0..1: higher = darker, faster-decaying highs.
+defAlgDamp :: Double
+defAlgDamp = 0.443
+
+-- | Allpass diffusion gain 0..1: higher = denser, smoother tail.
+defAlgSpread :: Double
+defAlgSpread = 0.68
+
+-- | Wet-path pre-delay (seconds), like the convolution's own pre-delay.
+defAlgPreDelay :: Double
+defAlgPreDelay = 0.0074
+
+defAlgWet :: Double
+defAlgWet = 0.36
+
+defAlgDry :: Double
+defAlgDry = 0.45
+
+--------------------------------------------------------------------------------
+-- Stereo widening (dry path)
+--------------------------------------------------------------------------------
+
+-- | First-order allpass coefficient applied to the R channel only, right
+--   after mixing.  Phase decorrelation vs. L gives interaural width; 0
+--   disables (L=R again).  Combined with the algorithmic reverb's L/R
+--   delay-table difference the whole chain carries stereo information.
+defStereoWidth :: Double
+defStereoWidth = 0.1
+
+--------------------------------------------------------------------------------
+-- Random LFO (amplitude wobble on the two partials)
+--------------------------------------------------------------------------------
+
+-- | LFO 1 (fundamental): slow, shallow — small amplitude wobble.
+defLFORate1 :: Double
+defLFORate1 = 0.8                    -- Hz
+
+-- | LFO 2 (overtone): faster, deeper — the 0.25·sin2 partial wobbles more.
+defLFORate2 :: Double
+defLFORate2 = 1.7                    -- Hz
+
+-- | LFO 3 (3rd/4th harmonic): fastest and deepest — the highest partials
+--   wobble the most, keeping the spectral "breathing" layered.
+defLFORate3 :: Double
+defLFORate3 = 2.5
+
+defLFODepth1 :: Double
+defLFODepth1 = 0.18                  -- ±18%
+
+defLFODepth2 :: Double
+defLFODepth2 = 0.19                  -- ±19%
+
+defLFODepth3 :: Double
+defLFODepth3 = 0.56
+
+defLFOSeed1 :: Int
+defLFOSeed1 = 0xDEAD
+
+defLFOSeed2 :: Int
+defLFOSeed2 = 0xBEEF
+
+defLFOSeed3 :: Int
+defLFOSeed3 = 0xDAA7
+
+--------------------------------------------------------------------------------
+-- Amplitude smoothing (polyphonic aftertouch click prevention)
+--------------------------------------------------------------------------------
+
+-- | Second-order (two-stage cascade) smoothing coefficient per audio block.
+--   Each stage moves this fraction of the way toward its target:
+--       s1' = s1 + k·(target − s1)
+--       s2' = s2 + k·(s1' − s2)      ← output
+--   Two stages give 40 dB/dec roll-off (vs 20 dB/dec single-stage), so
+--   aftertouch glides softly without clicks or steppy jumps.  k=0.1 gives
+--   roughly a 100 ms two-stage time constant at 512-frame blocks.
+defAmpSmoothK :: Double
+defAmpSmoothK = 0.01
+
+defAttack :: EnvelopeState
+defAttack = Attack 1.3 0.3    -- curve -> 0 for "instant" on (10th root of x)
+
+defDecay :: EnvelopeState
+defDecay = Decay 0.9 0.6
+
+defSustainLevel :: Float
+defSustainLevel = 0.8
+
+defSustainLevel' :: Double
+defSustainLevel' = 0.8
+
+defSustain :: EnvelopeState
+defSustain = Sustain defSustainLevel
+
+defRelease :: EnvelopeState
+defRelease = Release 0.2 0.15

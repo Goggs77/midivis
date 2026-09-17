@@ -5,10 +5,14 @@ import Midivis.World
 import Midivis.System.ExampleRenderer 
 import Midivis.Synth.Engine
 import Midivis.Synth.Types
-import Midivis.Synth.Render (renderCallback)
+import Midivis.Synth.Render (renderCallback, pushVoiceToFx, newVFilterState, newVFilterFresh, SynthFx(..))
 import Midivis.Synth.ConvReverb (newConvReverb)
 import Midivis.Synth.AlgorithmicReverb (newAlgReverb)
+import Midivis.Synth.Eq (newEqFx)
+import Midivis.Synth.Chorus (newChorusFx)
+import Midivis.Synth.Ensemble (newEnsembleFx)
 import Midivis.Synth.Preset
+import Midivis.Util.Math (fromDBFS)
 import Midivis.Resources.Audio.IR
 import Sound.PortAudio
 import qualified Sound.PortAudio.Base as Base
@@ -34,7 +38,8 @@ main :: IO ()
 main = do
     setLocaleEncoding utf8
     -- Use all available cores (equivalent to +RTS -N)
-    setNumCapabilities =<< getNumProcessors
+    cores <- getNumCapabilities
+    setNumCapabilities $ min 4 cores
     -- === 1. Create shared state ===
     midiTQue <- newTQueueIO
     -- initWorld now creates the VoicePool and CtrlBus itself; the same
@@ -45,15 +50,17 @@ main = do
     w0s <- readWorld w0TVar
     let vp  = voicePool w0s
         bus = ctrlBus w0s
-    let fpb = 512
+        -- the global sample counter lives in the World: the callback
+        -- advances it, the engine reads it to stamp note onsets
+        smpRef = sampleCounter w0s
+    let fpb = 1024
         nch = 2
         sr  = defSampleRate
     ir' <- ir
-    -- Active voice: carries its own waveform, envelope, LFOs AND reverb mix.
-    -- The two reverb inserts below are built from these parameters, so
-    -- switching the voice changes the ambience along with the timbre.
-    let activeVoice = flute
-        rv          = vReverb activeVoice
+    -- Active voice (from the World; preset switching updates it live).
+    -- It carries its own waveform, envelope, LFOs, FX and reverb mix.
+    let activeV = activeVoice w0s
+        rv      = vReverb activeV
     -- [DIAG] log IR stats
     hPutStrLn stderr $ "[Reverb] IR samples=" ++ show (length ir') ++
         " peak=" ++ show (maximum (0 : map abs ir')) ++
@@ -63,18 +70,35 @@ main = do
     reverbRef <- newIORef reverbObj
     -- === 1c. Algorithmic reverb (Freeverb pre-reverb) + stereo widener ===
     algRef <- newIORef =<< newAlgReverb (rvAlg rv)
-    widthRef <- newIORef (0.0, 0.0 :: Double)
-    -- DC blocker state (prev input/output per channel): kills the voice's
-    -- tanh DC offset before it reaches the reverbs' DC amplifiers.
+    -- stereo widener: (aSm, x1, y1) state + modulatable target a
+    widthRef <- newIORef (0.0, 0.0, 0.0 :: Double)
+    widthTgt <- newIORef defStereoWidth
+    -- DC blocker state (prev input/output per channel) + modulatable R
     dcRef <- newIORef (0.0, 0.0, 0.0, 0.0 :: Double)
-    -- Global sample counter, drives the random LFOs
-    smpRef <- newIORef (0.0 :: Double)
+    dcRTgt <- newIORef 0.9995
+    dcRSm  <- newIORef 0.9995
+    -- Global sample counter (in the World): drives the random LFOs and note
+    -- onset stamps.  (Callback advances it via sfSmpRef = sampleCounter w0s.)
     -- Per-voice smoothed amplitude (click-free aftertouch, 2nd order)
     ampSmoothRef <- newIORef =<< newArray (0, 127) (0.0 :: Double)
     ampMidRef    <- newIORef =<< newArray (0, 127) (0.0 :: Double)
+    -- Master compressor parameters (thr, ratio, atkSec, relSec): modulatable
+    -- targets + smoothed copy (start at the current hardcoded values).
+    let compThr   = fromDBFS (-6.0)
+        compRatio = 100.0
+        compAtk   = 0.001
+        compRel   = 0.325
+    compTgt <- newIORef (compThr, compRatio, compAtk, compRel)
+    compSm  <- newIORef (compThr, compRatio, compAtk, compRel)
+    -- Insert effects: 12-band EQ, trinity chorus, ensemble, per-voice filters
+    eqFxRef      <- newIORef =<< newEqFx
+    chorusFxRef  <- newIORef =<< newChorusFx
+    ensembleFxRef <- newIORef =<< newEnsembleFx
+    vFilterRef   <- newIORef =<< newVFilterState
+    vFreshRef    <- newIORef =<< newVFilterFresh
 
     -- === 2. Start synth engine (forkIO mainLoop) ===
-    initSynth w0TVar activeVoice
+    initSynth w0TVar
     hPutStrLn stderr "[Main] Synth engine started"
 
     -- === 3. Start PortAudio output (forkIO thread, callback mode) ===
@@ -126,6 +150,43 @@ main = do
                     let outParams = Just (StreamParameters (fromIntegral devIdx) (fromIntegral nch) (Base.PaTime 0.1))
                     -- Compressor gain state, carried across callbacks.
                     phVar <- newIORef (1.0 :: Double)
+                    -- Active preset, swappable live by the preset switch.
+                    voiceRef <- newIORef activeV
+                    -- Output block RMS (L, R), written by the callback each
+                    -- block; the Gloss thread smooths it into the World.
+                    rmsRef <- newIORef (0.0, 0.0 :: Double)
+                    -- Last output sample (L, R) in [-1,1], raw, per block.
+                    sampleRef <- newIORef (0.0, 0.0 :: Double)
+                    -- Bundle every mutable effect/state ref for the callback.
+                    let fx = SynthFx
+                            { sfGainRef      = phVar
+                            , sfCompTgt      = compTgt
+                            , sfCompSm       = compSm
+                            , sfReverbRef    = reverbRef
+                            , sfAlgRef       = algRef
+                            , sfSmpRef       = smpRef
+                            , sfAmpSmoothRef = ampSmoothRef
+                            , sfAmpMidRef    = ampMidRef
+                            , sfWidthRef     = widthRef
+                            , sfWidthTgt     = widthTgt
+                            , sfDcRef        = dcRef
+                            , sfDcRTgt       = dcRTgt
+                            , sfDcRSm        = dcRSm
+                            , sfEqRef        = eqFxRef
+                            , sfChorusRef    = chorusFxRef
+                            , sfEnsembleRef  = ensembleFxRef
+                            , sfVFilterRef   = vFilterRef
+                            , sfVFreshRef    = vFreshRef
+                            , sfVoice        = voiceRef
+                            , sfRmsRef       = rmsRef
+                            , sfSampleRef    = sampleRef
+                            }
+                    -- Push the active voice's FX/reverb base parameters into
+                    -- the effect targets (startup + preset switch).
+                    pushVoiceToFx activeV fx
+                    -- Publish the bundle so the preset switch (UI thread) can
+                    -- push new parameters in.
+                    writeIORef (synthFxRef w0s) (Just fx)
 
                     -- The real-time callback: render one frame (fpb = 2048,
                     -- ~21 ms of audio at 96 kHz) and hand it to PortAudio.
@@ -148,7 +209,7 @@ main = do
                             when (n `mod` 2000 == 0) $
                                 hPutStrLn stderr $ "[Audio] callback alive, frame="
                                     ++ show n
-                            r <- try (renderCallback vp sr (fromIntegral nFrames) outPtr phVar reverbRef algRef smpRef ampSmoothRef ampMidRef widthRef dcRef bus activeVoice)
+                            r <- try (renderCallback vp sr (fromIntegral nFrames) outPtr fx bus)
                             case r of
                                 Left (e :: SomeException) -> do
                                     hPutStrLn stderr $ "[Audio] callback EXCEPTION: " ++ show e

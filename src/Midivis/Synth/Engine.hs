@@ -25,14 +25,14 @@ import Midivis.Synth.Types (EnvelopeState(..))
 --   out of the world (created by 'initWorld') and fork mainLoop.
 --   Returns nothing — the same VoicePool lives inside the World for the
 --   PortAudio callback to capture.
-initSynth :: TVar World -> Voice -> IO ()
-initSynth w0TVar voice = do
-    _ <- forkIO $ mainLoop w0TVar voice
+initSynth :: TVar World -> IO ()
+initSynth w0TVar = do
+    _ <- forkIO $ mainLoop w0TVar
     return ()
 
 -- | Pitch-bend range in semitones (MIDI default: ±2; RPN 0 not tracked).
 defPitchBendSemitones :: Double
-defPitchBendSemitones = 2.0
+defPitchBendSemitones = 4.0
 
 -- | 14-bit bend value (0..16383, centre 8192) → frequency ratio.
 --   centre 8192 → 1.0; ±8192 → ±defPitchBendSemitones semitones.
@@ -63,8 +63,8 @@ applyPitchBend vp scala pb14 =
 --   This thread blocks on readTQueue.  Fine-grained envelope timing
 --   (Attack -> Decay -> Sustain -> Release -> Idle) is handled by the
 --   PortAudio callback thread which reads/writes VoicePool directly.
-mainLoop :: TVar World -> Voice -> IO ()
-mainLoop w0TVar voice = do
+mainLoop :: TVar World -> IO ()
+mainLoop w0TVar = do
     -- | Current 14-bit pitch-bend (centre 8192), applied at the frequency
     --   computation point below.  Kept at full 14-bit precision here; the
     --   compressed 0-127 copy on the control bus is for other consumers.
@@ -75,10 +75,19 @@ mainLoop w0TVar voice = do
           vp         = voicePool w0
           bus        = ctrlBus w0
           scala      = sclOfChoice w0
+          -- the active preset (switching updates this field in the World)
+          voice = activeVoice w0
           -- envelope trigger states from the active preset
           pE = vEnv voice
           !atkState = Attack (epAttack pE) (epAttackCurve pE)
           !relState = Release (epRelease pE) (epReleaseCurve pE)
+          -- ENV2 / ENV3 (modulation envelopes) trigger states
+          pE2 = vEnv2 voice
+          !atkState2 = Attack (epAttack pE2) (epAttackCurve pE2)
+          !relState2 = Release (epRelease pE2) (epReleaseCurve pE2)
+          pE3 = vEnv3 voice
+          !atkState3 = Attack (epAttack pE3) (epAttackCurve pE3)
+          !relState3 = Release (epRelease pE3) (epReleaseCurve pE3)
       midiEvts <- atomically $ readTQueue midiTQueue
 
       -- Phase 0: collect the set of noteIds currently held (repeated NoteOns
@@ -110,6 +119,10 @@ mainLoop w0TVar voice = do
                   -- first frequency calculation.
                   pb <- readIORef bendRef
                   writeFreq vp noteId (bendRatio pb * getFreq scala noteId)
+                  -- notelen: stamp the onset with the shared sample counter
+                  -- (the audio callback advances it every block).
+                  cnt <- readIORef (sampleCounter w0)
+                  writeOnset vp noteId cnt
                   env <- readEnv vp noteId
                   -- Only retrigger Attack if voice is not already sustaining
                   -- (Idle or Release).  cleanBuffer may send the same NoteOn
@@ -125,6 +138,19 @@ mainLoop w0TVar voice = do
                           -- repeated notes don't hit the same waveform sample.
                           when (env == Idle) $
                               writePhase vp noteId =<< randomRIO (0.0, 1.0)
+                  -- ENV2 / ENV3: trigger alongside ENV1, same retrigger guard.
+                  e2 <- readEnv2 vp noteId
+                  case e2 of
+                      Attack{}  -> return ()
+                      Decay{}   -> return ()
+                      Sustain{} -> return ()
+                      _         -> writeEnv2 vp noteId atkState2
+                  e3 <- readEnv3 vp noteId
+                  case e3 of
+                      Attack{}  -> return ()
+                      Decay{}   -> return ()
+                      Sustain{} -> return ()
+                      _         -> writeEnv3 vp noteId atkState3
               PolyphonicAftertouch -> do
                   let noteId = valueL e
                       amp    = fromIntegral (valueR e) / 127.0
@@ -155,4 +181,8 @@ mainLoop w0TVar voice = do
               Idle -> return ()
               Release _ _-> return () -- don't write relase repeatedly
               _ | slot `H.member` heldSet -> return ()
-                | otherwise               -> writeEnv vp slot relState
+                | otherwise               -> do
+                    writeEnv vp slot relState
+                    -- ENV2 / ENV3 enter their own release stages too
+                    writeEnv2 vp slot relState2
+                    writeEnv3 vp slot relState3

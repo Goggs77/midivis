@@ -69,6 +69,7 @@ library
     -- Modules exported by the library.
     exposed-modules:    Midivis.World,
                         Midivis.Render.Example,
+                        Midivis.Render.ShaderFX,
                         Midivis.System.ExampleRenderer,
                         Midivis.System.MidiQuery,
                         Midivis.EventHandler,
@@ -77,6 +78,8 @@ library
                         Midivis.Tuning.TuningParser,
                         Midivis.Tuning.Scala,
                         Midivis.Tuning.Ascl,
+                        Midivis.Tuning.Poly,
+                        Midivis.Tuning.Corpus,
                         Midivis.Resources.Tuning.All,
                         Midivis.Resources.Audio.IR,
                         Midivis.Resources.Font,
@@ -84,12 +87,19 @@ library
                         Midivis.Synth.Types,
                         Midivis.Synth.Smooth,
                         Midivis.Synth.Render,
+                        Midivis.Synth.VoicePool,
                         Midivis.Synth.Fft,
                         Midivis.Synth.ConvReverb,
                         Midivis.Synth.AlgorithmicReverb,
                         Midivis.Synth.WavLoader,
                         Midivis.Synth.CtrlBus,
                         Midivis.Synth.Preset,
+                        Midivis.Synth.Eq,
+                        Midivis.Synth.Sine,
+                        Midivis.Synth.ModMatrix,
+                        Midivis.Synth.Chorus,
+                        Midivis.Synth.Ensemble,
+                        Midivis.Synth.Vibrato,
                         Midivis.Render.Text,
                         Midivis.Resources.Tuning.Default,
                         Midivis.Resources.Tuning.EDO,
@@ -103,7 +113,6 @@ library
     other-modules:      
                         
                         Midivis.Util.Text,
-                        Midivis.Synth.VoicePool,
                         Midivis.Synth.KeyboardLayout,
                         Midivis.Resources.FontTH
 
@@ -130,6 +139,7 @@ library
                       hashable,
                       vector-algorithms,
                       with-utf8,
+                      universe-base,
                       -- audio processing
                       RtMidi,
                       storablevector, 
@@ -141,11 +151,20 @@ library
                       stm^>=2.5.3.1,
                       -- utf-8 text rendering
                       freetype2,
-                      containers
+                      containers,
+                      -- no laziness
+                      deepseq
 
 
     -- Directories containing source files.
     hs-source-dirs:   src\
+
+    -- C++ DSP core (12-band EQ, cbits/Eq12.cpp).  Compiled with g++ and
+    -- linked into the library; the C++ runtime (libstdc++) is pulled in
+    -- automatically when cxx-sources are present.
+    cxx-sources:      cbits/Eq12.cpp
+    include-dirs:     cbits
+    cxx-options:      -O3 -std=c++20
 
     -- Base language which the package is written in.
     default-language: Haskell2010
@@ -156,9 +175,17 @@ executable midivis
 
     -- Embed default RTS options into the executable:
     --   -N      use all cores
-    --   -M2G    cap heap at 2GB (prevents runaway growth / OOM)
+    --   -M256M  cap heap (prevents runaway growth / OOM)
+    --   --nonmoving-gc   concurrent mark-sweep GC: avoids long copying GC
+    --                    pauses on the large long-lived heap (fonts, IR,
+    --                    delay lines) — important for the real-time audio
+    --                    callback thread
+    --   -A64m   larger allocation area: far fewer minor GCs per second,
+    --                    at the cost of more heap between collections
     ghc-options:      -rtsopts=all
                       -with-rtsopts=-M256M
+                      -with-rtsopts=--nonmoving-gc
+                      -with-rtsopts=-A64m
 
     -- .hs or .lhs file containing the Main module.
     main-is:          Main.hs
@@ -216,3 +243,28 @@ test-suite midivis-test
                       stm ^>=2.5.3.1,
                       vector,
                       gloss-relative
+
+-- | Full-chain voicing test: drives the preset voices through every stage of
+--   the signal chain and logs per-stage level monitoring to a .log file.
+--   See test/fullchain/FullChainTest.hs.
+test-suite fullchain-test
+    import:           warnings
+
+    default-language: Haskell2010
+
+    type:             exitcode-stdio-1.0
+
+    -- allow +RTS overrides at runtime (GC / allocation analysis)
+    ghc-options:      -rtsopts=all
+
+    hs-source-dirs:   test/fullchain
+
+    main-is:          FullChainTest.hs
+
+    build-depends:
+                      base ^>=4.20.1.0,
+                      midivis,
+                      stm ^>=2.5.3.1,
+                      array,
+                      directory,
+                      vector

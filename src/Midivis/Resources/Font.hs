@@ -39,9 +39,12 @@ import           Midivis.Resources.FontTH
 --   Each result is (glyphs, pages, metrics, kerning).
 fontData :: ([(Char, GlyphInfo)], [AtlasPage], FontMetrics, [(Int, Int, Int)])
 fontData = mergeFonts
-    $(renderFontQ "assets/fonts/GoogleSans-Regular.ttf" 64)
-    $(renderFontCharsQ "assets/fonts/NotoSerifSC-Regular.ttf"
-                       "assets/fonts/charset.txt" 64)
+    $(renderFontQ "assets/fonts/GoogleSans-Regular.ttf" 64) $
+    mergeFonts
+        $(renderFontCharsQ "assets/fonts/NotoSerifSC-Regular.ttf"
+                           "assets/fonts/charset.txt" 64)
+        $(renderFontCharsQ "assets/fonts/LibertinusMath-Regular.ttf"
+                           "assets/fonts/charset.txt" 64)
 
 -- | Glyph lookup table, keyed by 'fromEnum' of the character.
 fontGlyphMap :: IntMap GlyphInfo
