@@ -17,7 +17,7 @@ module Graphics.Gloss.Internals.Rendering.Shader
         , compileShader
         , withShader
         , deleteShader
-        , uniform1f, uniform1i, uniform2f, uniform1fv
+        , uniform1f, uniform1i, uniform2f, uniform4f, uniform1fv
         , renderTexturedQuadWithShader
         ) where
 
@@ -109,6 +109,13 @@ uniform2f :: Shader -> String -> (Float, Float) -> IO ()
 uniform2f sh name (x, y) =
     withLocation sh name $ \loc ->
         GL.uniform loc $= GL.Vertex2 (x :: GL.GLfloat) (y :: GL.GLfloat)
+
+-- | Set a vec4 uniform by name (no-op if absent).
+uniform4f :: Shader -> String -> (Float, Float, Float, Float) -> IO ()
+uniform4f sh name (x, y, z, w) =
+    withLocation sh name $ \loc ->
+        GL.uniform loc $= GL.Color4
+            (x :: GL.GLfloat) (y :: GL.GLfloat) (z :: GL.GLfloat) (w :: GL.GLfloat)
 
 -- | Set a float ARRAY uniform by name (no-op if absent).  The GLSL side
 --   declares a fixed-size array, e.g. @uniform float uData[129];@.  The

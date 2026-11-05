@@ -72,6 +72,7 @@ data World =  World
         sclIndex :: !Int,
         freqA4 :: !Double,
         tuningScroll :: TuningScroll,
+        tuningRepeatAt :: !Float,
         sclOfChoice :: !Ascl,
         keyboardShift :: !Int,
         chordName :: T.Text,
@@ -87,6 +88,7 @@ data World =  World
         --   voice from here, so a switch takes effect on the next event).
         presetIndex :: !Int,
         presetScroll :: TuningScroll,
+        presetRepeatAt :: !Float,
         activeVoice :: !Voice,
         -- | The audio callback's effect/state bundle, published by Main once
         --   the audio thread is up (preset switch pushes new parameters in).
@@ -130,6 +132,7 @@ initWorld tq = do
     sclIndex = 10,
     freqA4 = 440,
     tuningScroll = Stop,
+    tuningRepeatAt = 0,
     sclOfChoice = calibrateA4 (quintal12) 440,
     keyboardShift = 0,
     chordName = T.pack "",
@@ -140,6 +143,7 @@ initWorld tq = do
     -- presets
     presetIndex = 0,
     presetScroll = Stop,
+    presetRepeatAt = 0,
     activeVoice = piano,
     synthFxRef = fxr
     }

@@ -347,10 +347,10 @@ piano = Voice
             !cc = scCC ctx
             !noise = scNoise' ctx
             !m1 = 1.0 + lfoAt ctx 0 * 0.02
-            !x = sawPush (exp(cc!!1)) f (ph) + 11.2*noise +
+            !x = sawPush (exp(cc!!1 / 3.0)) f (ph) + 11.2*noise +
                 -- supersaw generation, most of the magics are consecutive prime ratios
                 -- that are indistinguishable from randomRIO under such precision.
-                -- reduce DC by multiplying it by another an
+                -- reduce DC by multiplying it with another an
                 ( saw (f) (ph + 0.9961872484643084)
                 + saw (f) (ph + 0.9995765403345331)
                 + saw (f) (ph + 0.9987312328187777)
@@ -421,7 +421,7 @@ piano = Voice
             , EqBand 4096.0  0.0 (1/7)      1.0    -- 8
             , EqBand 8192.0  0.0 (1/7)      1.0    -- 9
             , EqBand 16384.0 (-2.0) (2/7)   0.707    -- 10
-            , EqBand 20000.0 0.0 (5/7)      0.707  -- 11 high cut
+            , EqBand 18000.0 0.0 (5/7)      0.5    -- 11 soft 18 kHz low-pass
             ]
         , fxChorusMix    = 0.1
         , fxChorusDepth   = 0.8

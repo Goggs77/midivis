@@ -26,15 +26,11 @@ module Midivis.Render.Text
     , wrapLines
     ) where
 
-import qualified Data.ByteString          as BS
-import qualified Data.ByteString.Builder  as BB
-import qualified Data.ByteString.Lazy     as BL
 import           Data.Bits                ( shiftL, (.|.) )
 import           Data.IORef
 import           Data.IntMap.Strict       ( IntMap )
 import qualified Data.IntMap.Strict       as IM
 import qualified Data.Map.Strict          as M
-import           Data.Word                ( Word8 )
 import           Data.Maybe               ( fromMaybe )
 import           System.IO.Unsafe         ( unsafePerformIO )
 
@@ -59,29 +55,22 @@ rasterSize = 64
 -- Atlas pages -> gloss BitmapData (cached per page & color)
 -------------------------------------------------------------------------------
 
--- | Cache: page index -> (colorKey -> BitmapData).
---   colorKey of white is used for the untouched white pages.
-atlasCache :: IORef (IntMap (IntMap BitmapData))
+-- | Cache the single white/coverage atlas page for each page index.  Color is
+--   applied at draw time, so changing text color no longer duplicates a
+--   multi-megabyte page in CPU and GPU memory.
+atlasCache :: IORef (IntMap BitmapData)
 atlasCache = unsafePerformIO (newIORef IM.empty)
 {-# NOINLINE atlasCache #-}
 
-whiteKey :: Int
-whiteKey = colorKey white
-
--- | Get (or build-and-cache) the 'BitmapData' of atlas page @i@ tinted with
---   color @c@.  White is short-circuited to the original white page (no
---   per-pixel baking), so the common case costs nothing.
-atlasData :: Color -> Int -> BitmapData
-atlasData c i = unsafePerformIO $ do
+-- | Get (or build-and-cache) the white coverage bitmap for atlas page @i@.
+atlasData :: Int -> BitmapData
+atlasData i = unsafePerformIO $ do
     pages <- readIORef atlasCache
-    let k = colorKey c
-    case IM.lookup i pages >>= IM.lookup k of
+    case IM.lookup i pages of
       Just bd -> pure bd
       Nothing -> do
-        let bd | k == whiteKey = whitePage i
-               | otherwise     = tintedPage c i
-        modifyIORef' atlasCache
-            (IM.insertWith IM.union i (IM.singleton k bd))
+        let bd = whitePage i
+        modifyIORef' atlasCache (IM.insert i bd)
         pure bd
 
 -- | Integer key of a color (RGBA 8-bit packed) for the cache.
@@ -94,41 +83,11 @@ colorKey c = (w r `shiftL` 24) .|. (w g `shiftL` 16) .|. (w b `shiftL` 8) .|. w 
 -- | Untouched white page: RGBA, top-to-bottom.
 whitePage :: Int -> BitmapData
 whitePage i =
-    bitmapDataOfByteString w h fmt (apBytes p) True
+    bitmapDataOfTintableByteString w h fmt (apBytes p) True
   where
     p        = fontAtlas !! i
     (w, h)   = apSize p
     fmt      = BitmapFormat TopToBottom PxRGBA
-
--- | Tinted copy of a page: RGB scaled by color, alpha scaled by color alpha.
---   Uses a 'Data.ByteString.Builder' for a single-pass O(size) build (no
---   [Word8] list buildup — that would blow the -M256M heap on multi-MB pages).
-tintedPage :: Color -> Int -> BitmapData
-tintedPage c i =
-    bitmapDataOfByteString w h fmt bytes' True
-  where
-    p         = fontAtlas !! i
-    (w, h)    = apSize p
-    fmt       = BitmapFormat TopToBottom PxRGBA
-    (cr, cg, cb, ca) = rgbaOfColor c
-    src       = apBytes p
-    n         = BS.length src
-    bytes'    = BL.toStrict (BB.toLazyByteString (go 0))
-      where
-        go :: Int -> BB.Builder
-        go k
-            | k >= n    = mempty
-            | otherwise =
-                BB.word8 (scale8 cr r) <> BB.word8 (scale8 cg g)
-                <> BB.word8 (scale8 cb b) <> BB.word8 (scale8 ca a)
-                <> go (k + 4)
-          where
-            r = BS.index src k
-            g = BS.index src (k + 1)
-            b = BS.index src (k + 2)
-            a = BS.index src (k + 3)
-    scale8 :: Float -> Word8 -> Word8
-    scale8 f w = fromIntegral (round (fromIntegral w * f) `min` 255)
 
 -------------------------------------------------------------------------------
 -- Glyph layout (shared by single-line and multi-line text)
@@ -182,9 +141,10 @@ glyphPic :: Color -> Float -> GlyphInfo -> Picture
 glyphPic c pen gi
     | w <= 0 || h <= 0 = mempty
     | otherwise =
-        Translate px py
-                  (bitmapSection (Rectangle (gRect gi) (gSize gi))
-                                 (atlasData c (pageOf gi)))
+        Color c $
+            Translate px py
+                (bitmapSection (Rectangle (gRect gi) (gSize gi))
+                               (atlasData (pageOf gi)))
   where
     (w, h)  = gSize gi
     (px, py) = glyphCentre pen gi
@@ -237,13 +197,14 @@ textMemoCache :: IORef (M.Map (Int, String) (Picture, (Float, Float)))
 textMemoCache = unsafePerformIO (newIORef M.empty)
 {-# NOINLINE textMemoCache #-}
 
--- | Cap: keep only the most recent entries if the table grows unbounded
---   (in practice the text universe is small; this is a safety valve).
+-- | Bound the cache size.  On overflow, evict one deterministic entry rather
+--   than discarding the entire useful cache.
 --   @capped n k v = \\m -> ...@ so it can be used with 'modifyIORef''.
 capped :: Ord k => Int -> k -> v -> M.Map k v -> M.Map k v
 capped n k v m
-    | M.size m' > n = M.singleton k v
-    | otherwise     = m'
+    | M.member k m = m'
+    | M.size m < n = m'
+    | otherwise    = M.insert k v (snd (M.deleteFindMin m))
   where
     m' = M.insert k v m
 

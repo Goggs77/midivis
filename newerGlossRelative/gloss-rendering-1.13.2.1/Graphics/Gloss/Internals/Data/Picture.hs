@@ -15,6 +15,8 @@ module Graphics.Gloss.Internals.Data.Picture
         , bitmapSize
         , bitmapOfForeignPtr
         , bitmapDataOfForeignPtr
+        , bitmapDataOfTexture
+        , bitmapDataOfTintableByteString
         , bitmapOfByteString
         , bitmapDataOfByteString
         , bitmapOfBMP
@@ -96,6 +98,11 @@ data Picture
         --   and second argument determines the bitmap data.
         | BitmapSection Rectangle BitmapData
 
+        -- | A GPU line strip backed by an OpenGL array buffer.  The two
+        --   integers are the buffer object id and vertex count.  Coordinates
+        --   are in the picture's native units, like normal 'Line' vertices.
+        | LineStripBuffer Int Int
+
         -- Color ------------------------------------------
         -- | A picture drawn with this color.
         | Color         Color           Picture
@@ -147,7 +154,20 @@ bitmapOfForeignPtr width height fmt fptr cacheMe =
 bitmapDataOfForeignPtr :: Int -> Int -> BitmapFormat -> ForeignPtr Word8 -> Bool -> BitmapData
 bitmapDataOfForeignPtr width height fmt fptr cacheMe
  = let  len     = width * height * 4
-   in   BitmapData len fmt (width,height) cacheMe fptr
+   in   BitmapData len fmt (width,height) cacheMe fptr Nothing False
+
+
+-- | O(1). Use an existing OpenGL texture object as bitmap data.
+--   The texture is borrowed: the caller remains responsible for its lifetime.
+bitmapDataOfTexture :: Int -> Int -> BitmapFormat -> Int -> BitmapData
+bitmapDataOfTexture width height fmt textureId
+ = let  len     = width * height * 4
+   in   BitmapData len fmt (width,height) False emptyForeignPtr (Just textureId) False
+
+-- | Placeholder pointer for texture-only bitmaps.  It is never dereferenced.
+emptyForeignPtr :: ForeignPtr Word8
+emptyForeignPtr = unsafePerformIO (newForeignPtr_ nullPtr)
+{-# NOINLINE emptyForeignPtr #-}
 
 
 -- | O(size). Copy a `ByteString` of RGBA data into a bitmap with the given
@@ -172,8 +192,15 @@ bitmapDataOfByteString width height fmt bs cacheMe
         BSU.unsafeUseAsCString bs
          $ \cstr -> copyBytes ptr (castPtr cstr) len
 
-        return $ BitmapData len fmt (width, height) cacheMe fptr
+        return $ BitmapData len fmt (width, height) cacheMe fptr Nothing False
 {-# NOINLINE bitmapDataOfByteString #-}
+
+-- | Like 'bitmapDataOfByteString', but the current Gloss color is applied
+--   while drawing instead of being baked into the pixels.
+bitmapDataOfTintableByteString
+    :: Int -> Int -> BitmapFormat -> ByteString -> Bool -> BitmapData
+bitmapDataOfTintableByteString width height fmt bs cacheMe =
+    (bitmapDataOfByteString width height fmt bs cacheMe) { bitmapTint = True }
 
 
 -- | O(size). Copy a `BMP` file into a bitmap.
@@ -196,7 +223,7 @@ bitmapDataOfBMP bmp
         BSU.unsafeUseAsCString bs
          $ \cstr -> copyBytes ptr (castPtr cstr) len
 
-        return $ BitmapData len (BitmapFormat BottomToTop PxRGBA) (width,height) True fptr
+        return $ BitmapData len (BitmapFormat BottomToTop PxRGBA) (width,height) True fptr Nothing False
 {-# NOINLINE bitmapDataOfBMP #-}
 
 

@@ -3,6 +3,7 @@ import Graphics.Gloss.Relative
 
 import Midivis.World
 import Midivis.System.MidiQuery (appendMidiEvent, clearMidiBuffer)
+import Midivis.System.Selection
 import Midivis.Midi.MidiParser (MidiEvent(..))
 import Midivis.Midi.MidiEventType (MidiEventType(NoteOn, NoteOff))
 
@@ -28,40 +29,24 @@ defKeyVelocity :: Int
 defKeyVelocity = 100
 
 handleEvent :: Event -> World -> IO World
-handleEvent (EventKey (Char '=') Down _ _) w0 = return w0 {
-    tuningScroll = Next
-    }
+handleEvent (EventKey (Char '=') Down _ _) w0 = startTuningSelection Next w0
 
-handleEvent (EventKey (Char '-') Down _ _) w0 = return w0 {
-    tuningScroll = Prev
-    }
+handleEvent (EventKey (Char '-') Down _ _) w0 = startTuningSelection Prev w0
 
-handleEvent (EventKey (Char '=') Up _ _) w0 = return w0 {
-    tuningScroll = Stop
-    }
+handleEvent (EventKey (Char '=') Up _ _) w0 = stopTuningSelection w0
 
-handleEvent (EventKey (Char '-') Up _ _) w0 = return w0 {
-    tuningScroll = Stop
-    }
+handleEvent (EventKey (Char '-') Up _ _) w0 = stopTuningSelection w0
 
 -- Preset switching: ',' previous / '.' next (scroll while held, like '='/'-'
 -- for tunings).  The engine and audio callback pick the new voice from the
 -- World on their next pass; the parameters are pushed by stepPreset.
-handleEvent (EventKey (Char ',') Down _ _) w0 = return w0 {
-    presetScroll = Prev
-    }
+handleEvent (EventKey (Char ',') Down _ _) w0 = startPresetSelection Prev w0
 
-handleEvent (EventKey (Char '.') Down _ _) w0 = return w0 {
-    presetScroll = Next
-    }
+handleEvent (EventKey (Char '.') Down _ _) w0 = startPresetSelection Next w0
 
-handleEvent (EventKey (Char ',') Up _ _) w0 = return w0 {
-    presetScroll = Stop
-    }
+handleEvent (EventKey (Char ',') Up _ _) w0 = stopPresetSelection w0
 
-handleEvent (EventKey (Char '.') Up _ _) w0 = return w0 {
-    presetScroll = Stop
-    }
+handleEvent (EventKey (Char '.') Up _ _) w0 = stopPresetSelection w0
 
 -- 'Keyboard' here refers to keyboard for typing
 handleEvent (EventKey (Char '[') Down _ _) w0 = return w0 {

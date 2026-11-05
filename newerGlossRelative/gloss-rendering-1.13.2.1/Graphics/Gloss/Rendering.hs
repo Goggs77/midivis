@@ -19,6 +19,8 @@ module Graphics.Gloss.Rendering
         , BitmapFormat(..), PixelFormat(..), RowOrder(..)
         , bitmapOfForeignPtr
         , bitmapDataOfForeignPtr
+        , bitmapDataOfTexture
+        , bitmapDataOfTintableByteString
         , bitmapOfByteString
         , bitmapDataOfByteString
         , bitmapOfBMP
@@ -39,8 +41,9 @@ module Graphics.Gloss.Rendering
         , shaderProgramOf
         , compileShader
         , withShader
-        , uniform1f, uniform1i, uniform2f, uniform1fv
-        , renderTexturedQuadWithShader)
+        , uniform1f, uniform1i, uniform2f, uniform4f, uniform1fv
+        , renderTexturedQuadWithShader
+        , lineStripBufferPicture)
 
 where
 import Graphics.Gloss.Internals.Rendering.Common

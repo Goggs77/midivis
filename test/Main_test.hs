@@ -1,15 +1,17 @@
 module Main (main) where
 
-import Control.Concurrent.STM (newTQueueIO)
+import Control.Concurrent.STM (atomically, newTQueueIO, tryReadTQueue)
 import qualified Data.Vector.Storable as V
 import Graphics.Gloss.Relative
 
 import Midivis.Tuning.Scala
 import Midivis.World
 import Midivis.EventHandler
-import Midivis.System.MidiQuery (bufferMidi, initMidi)
+import Midivis.System.MidiQuery (initMidi, midiPollThread)
+import Midivis.System.ExampleRenderer (stepPreset, stepTuning)
 import Midivis.Midi.MidiParser (MidiEvent(..))
 import Midivis.Midi.MidiEventType (MidiEventType(NoteOn, NoteOff))
+import Midivis.Synth.Preset (Voice(..), FxParams(..), EqBand(..), piano)
 
 -- gloss-relative EventKey 是记录: EventKey { eventKey, eventKeyState, eventModifiers, eventMouse }
 keyEv :: Key -> KeyState -> Event
@@ -22,6 +24,17 @@ keyEv k st = EventKey
 
 main :: IO ()
 main = do
+    -- Piano top-end EQ: a gentle low-pass above the audible fundamental range.
+    case reverse (fxEqBands (vFx piano)) of
+        EqBand freq gain shape q : _ ->
+            if abs (freq - 18000.0) < 1e-9
+                && abs gain < 1e-9
+                && shape == 5/7
+                && q <= 0.5
+                then pure ()
+                else error "piano final EQ band should be a soft 18 kHz low-pass"
+        [] -> error "piano preset should define EQ bands"
+
     -- 原 Scala 测试
     let tuning = Scala "test" 1 "test tuning" 2 [2]
         calibrated = calibrate tuning 1 440
@@ -73,10 +86,24 @@ main = do
     if evts2 == [MidiEvent 1 NoteOn zNote 100, MidiEvent 1 NoteOff zNote 0]
         then pure ()
         else error ("Up 'z' should emit NoteOff " ++ show zNote ++ " 0, got " ++ show evts2)
+    let tuningBefore = sclIndex w2
     w3 <- handleEvent (keyEv (Char '=') Down) w2
-    if tuningScroll w3 == Next
+    if tuningScroll w3 == Next && sclIndex w3 /= tuningBefore
         then pure ()
-        else error "Down '=' should scroll tuning"
+        else error "Down '=' should change tuning immediately"
+    earlyTuning <- stepTuning w3
+    if sclIndex earlyTuning == sclIndex w3
+        then pure ()
+        else error "held tuning key repeated before its initial delay"
+    dueTuning <- stepTuning w3 { time = tuningRepeatAt w3 }
+    if sclIndex dueTuning /= sclIndex w3
+        then pure ()
+        else error "held tuning key should repeat when due"
+    tuningUp <- handleEvent (keyEv (Char '=') Up) dueTuning
+    stoppedTuning <- stepTuning tuningUp { time = 1.0e9 }
+    if sclIndex stoppedTuning == sclIndex tuningUp
+        then pure ()
+        else error "tuning repeat continued after key-up"
     w4 <- handleEvent (keyEv (Char ' ') Down) w3
     if V.length (unpack (midiEvtBuf w4)) == 2
         then pure ()
@@ -97,25 +124,40 @@ main = do
         else error "Backspace (KeyBackspace) should clear all held NoteOns"
 
     -- 6. Preset switching: ',' = Prev, '.' = Next (scroll), Up = Stop
+    let presetBefore = presetIndex b3
     p1 <- handleEvent (keyEv (Char ',') Down) b3
-    if presetScroll p1 == Prev
+    if presetScroll p1 == Prev && presetIndex p1 /= presetBefore
         then pure ()
-        else error "Down ',' should scroll preset Prev"
+        else error "Down ',' should change preset immediately"
     p2 <- handleEvent (keyEv (Char '.') Down) b3
-    if presetScroll p2 == Next
+    if presetScroll p2 == Next && presetIndex p2 /= presetBefore
         then pure ()
-        else error "Down '.' should scroll preset Next"
+        else error "Down '.' should change preset immediately"
+    earlyPreset <- stepPreset p2
+    if presetIndex earlyPreset == presetIndex p2
+        then pure ()
+        else error "held preset key repeated before its initial delay"
+    duePreset <- stepPreset p2 { time = presetRepeatAt p2 }
+    if presetIndex duePreset /= presetIndex p2
+        then pure ()
+        else error "held preset key should repeat when due"
     p3 <- handleEvent (keyEv (Char '.') Up) p2
     if presetScroll p3 == Stop
         then pure ()
         else error "Up '.' should stop preset scroll"
+    stoppedPreset <- stepPreset p3 { time = 1.0e9 }
+    if presetIndex stoppedPreset == presetIndex p3
+        then pure ()
+        else error "preset repeat continued after key-up"
 
     -- === MIDI 设备缺失降级验证 ===
-    -- 1. bufferMidi Nothing 是 no-op（无设备时不崩、不改 World）
-    w5 <- bufferMidi Nothing w4
-    if V.length (unpack (midiEvtBuf w5)) == 2
-        then pure ()
-        else error "bufferMidi Nothing should be a no-op"
+    -- 1. 无 MIDI 设备时轮询线程立即退出且不产生事件
+    pollQueue <- newTQueueIO
+    midiPollThread Nothing pollQueue
+    noEvent <- atomically $ tryReadTQueue pollQueue
+    case noEvent of
+        Nothing -> pure ()
+        Just _  -> error "midiPollThread Nothing should not enqueue events"
     -- 2. initMidi 永不抛异常（有设备 → Just，无设备 → Nothing）
     dev <- initMidi
     case dev of

@@ -29,7 +29,11 @@ data BitmapData
         , bitmapFormat     :: BitmapFormat
         , bitmapSize       :: (Int, Int) -- ^ width, height in pixels
         , bitmapCacheMe    :: Bool
-        , bitmapPointer    :: (ForeignPtr Word8) }
+        , bitmapPointer    :: (ForeignPtr Word8)
+        , bitmapTexture    :: Maybe Int
+        , bitmapTint       :: Bool }
+          -- ^ Existing OpenGL texture to sample instead of uploading
+          --   'bitmapPointer'.  Nothing for ordinary CPU-backed bitmaps.
         deriving (Eq, Data, Typeable)
 
 

@@ -2,21 +2,20 @@
 
 module Midivis.Render.Example where
 
-import Data.Maybe
 import qualified Data.Vector.Storable as V
+import qualified Data.Vector.Storable.Mutable as VM
 import Data.Vector.Storable ( toList )
-import qualified Data.StorableVector as SV
 import Graphics.Gloss.Relative
-import Graphics.Gloss.Relative.Interface
-import Data.Tuple.Extra (uncurry3)
 import qualified Data.Text as T
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad (when)
-import qualified Data.Map.Strict as M
+import Control.Monad (forM_, when)
+import Foreign.Ptr (castPtr, plusPtr)
+import Foreign.Storable (sizeOf)
+import qualified Graphics.Rendering.OpenGL as GL
+import Graphics.Rendering.OpenGL (($=))
 
 import Midivis.Tuning.Ascl 
-import Midivis.Tuning.Poly
 import Midivis.Tuning.Corpus
 import Midivis.Midi.MidiParser
 import Midivis.Util.Math
@@ -24,10 +23,9 @@ import Midivis.World
 import Midivis.Synth.Types
 import Midivis.Synth.VoicePool
 import Midivis.Midi.MidiEventType (MidiEventType(..))
-import Midivis.Render.Text (utf8Banner, TextSize(..), titleSize, subtitleSize, bodySize, TextFill(..), WrapMethod (WrapByWord, WrapByChar), LineWidthMode(..), utf8TextBox, TextDebug (..))
+import Midivis.Render.Text (utf8Banner, TextSize(..), subtitleSize, bodySize, TextFill(..), WrapMethod (WrapByWord), LineWidthMode(..), utf8TextBox, TextDebug (..))
 import Midivis.Synth.CtrlBus
-import Midivis.Render.ShaderFX (shaderIdentity, shaderInvert, shaderGrayscale, shaderBlur, shaderTodo2, shaderPassUniform1fv)
-import Midivis.Synth.KeyboardLayout
+import Midivis.Render.ShaderFX (shaderIdentity, shaderInvert, shaderGrayscale, shaderBlur)
 
 rgba :: Float -> Float -> Float -> Float -> Color
 rgba = makeColor
@@ -96,21 +94,7 @@ drawRelativeFrame w0 = do
         setTitleOnce $ synopsis $ sclOfChoice w0
         st <- stereoGraph w0
         let mainFrame = Overlay [movingLine, centerPoint, leftText, leftLine, middleCircle, centerFrame st, bottomText]
-        -- Feed the TODO2 shader 129 float angles: one per polyphony slot
-        -- (held-note angles from the same formula as mapToRadii, 0-padded) +
-        -- baseAngle as the 129th element.  GLSL: uniform float uAngles[129];
-        -- The TODO2 pass layers ON TOP of the invert pass (invert runs first
-        -- on mainFrame, then todo2 post-processes the inverted result).
-        let evts    = unpack $ midiEvtBuf w0
-            noteOns = V.filter (\e -> evt e == NoteOn) evts
-            freqs   = V.map (getFreq (sclOfChoice w0)) (V.map valueL noteOns)
-            angles  = V.map (\x -> 2 * pi * log2 (x / freqA4 w0) + baseAngle w0) freqs
-            nAng    = Prelude.min 128 (V.length angles)
-            angList = toList $ V.map realToFrac (V.take nAng angles)
-                      V.++ V.replicate (128 - nAng) 0.0
-                      V.++ V.singleton (realToFrac (baseAngle w0))   -- 129 total
-            shaderSetup s = shaderPassUniform1fv s "uAngles" angList
-        return $ fxWith shaderTodo2 shaderSetup (fx shaderInvert mainFrame)
+        return $ fx shaderInvert mainFrame
         where 
             amp = realToFrac $ ampsum w0
             l = realToFrac (Prelude.min 1 (rmsSmL w0 * 2)) :: Float
@@ -182,41 +166,124 @@ customRadius w0 mw clr angle radius nameIndex  =
         p2 = (Relative $ realToFrac . (0.5*radius*) . cos $ angle + noise, Relative $ realToFrac.(0.5*radius*).sin $ angle - noise)
         noise = detNoise (d2i angle) (nameIndex) * 2 * mw ** 2
 
--- | Segment cache for the stereo waveform ring.  The ring buffer writes 2
---   samples per step at the pointer (stepRms), so a 'segSize'-sample
---   segment is rewritten at most once per (segSize/2) steps.  Each draw
---   rebuilds only the segment(s) the ring pointer passed since the last
---   draw and reuses every other segment, so the per-point polar/trig build
---   is amortised instead of being redone for all points every frame.
---   NOTE: the polyline is still rasterised in full every frame (the content
---   genuinely changes each draw — the step chain runs faster than the draw
---   loop), so the cache removes the *build* cost, not the raster cost.
+-- | Segment size for partial stereo waveform updates.
 segSize :: Int
 segSize = 32
 
--- ring size at last draw (a change forces a full rebuild)
+data StereoBuffer = StereoBuffer
+    { stereoBufferObject :: !GL.BufferObject
+    , stereoBufferFloats :: !Int
+    }
+
+-- | Cached [x,y] normalized vertices.  Only segments touched by the ring
+--   pointer are recomputed; the complete storable buffer is retained between
+--   draws, so no per-frame point lists or Picture trees are allocated.
+stereoVerticesRef :: IORef (V.Vector Float)
+stereoVerticesRef = unsafePerformIO (newIORef V.empty)
+{-# NOINLINE stereoVerticesRef #-}
+
+stereoBufferRef :: IORef (Maybe StereoBuffer)
+stereoBufferRef = unsafePerformIO (newIORef Nothing)
+{-# NOINLINE stereoBufferRef #-}
+
+-- Ring size at last draw (a change forces a full rebuild).
 segLastSzRef :: IORef Int
 segLastSzRef = unsafePerformIO (newIORef 0)
 {-# NOINLINE segLastSzRef #-}
 
--- ring pointer at last draw
+-- Ring pointer at last draw.
 segLastIdxRef :: IORef Int
 segLastIdxRef = unsafePerformIO (newIORef (-1))
 {-# NOINLINE segLastIdxRef #-}
 
--- segment index -> frame
-segCacheRef :: IORef (M.Map Int Frame)
-segCacheRef = unsafePerformIO (newIORef M.empty)
-{-# NOINLINE segCacheRef #-}
-
 -- | Which segments the ring pointer has passed since the last draw.
 --   @last@ = -1 means the first draw (everything is dirty).
 dirtySegs :: Int -> Int -> Int -> [Int]
-dirtySegs last cur nSeg
-    | last < 0    = [0 .. nSeg - 1]
-    | last == cur = []
-    | last < cur  = [last `div` segSize .. cur `div` segSize]
-    | otherwise   = [last `div` segSize .. nSeg - 1] ++ [0 .. cur `div` segSize]
+dirtySegs prev cur nSeg
+    | prev < 0    = [0 .. nSeg - 1]
+    | prev == cur = []
+    | prev < cur  = [prev `div` segSize .. cur `div` segSize]
+    | otherwise   = [prev `div` segSize .. nSeg - 1] ++ [0 .. cur `div` segSize]
+
+stereoPoint :: V.Vector Double -> Int -> Int -> (Float, Float)
+stereoPoint samples n x =
+    let a = samples `V.unsafeIndex` x
+        rho = abs (0.98 * tanh (2 * a))
+        theta = 2 * pi * fromIntegral x / fromIntegral n
+              + if odd x then pi else 0
+    in ( realToFrac (rho * cos theta)
+       , realToFrac (rho * sin theta) )
+
+stereoVertices :: V.Vector Double -> Int -> V.Vector Float
+stereoVertices samples n =
+    V.generate (2 * n) $ \j ->
+        let (x, y) = stereoPoint samples n (j `div` 2)
+        in if even j then x else y
+
+updateStereoVertices :: V.Vector Double -> Int -> [Int] -> IO (V.Vector Float)
+updateStereoVertices samples n dirtySegs' = do
+    old <- readIORef stereoVerticesRef
+    if V.length old /= 2 * n
+        then pure (stereoVertices samples n)
+        else do
+            mutable <- V.unsafeThaw old
+            forM_ dirtySegs' $ \k ->
+                let lo = k * segSize
+                    hi = Prelude.min n (lo + segSize)
+                in forM_ [lo .. hi - 1] $ \x -> do
+                    let (vx, vy) = stereoPoint samples n x
+                    VM.write mutable (2 * x) vx
+                    VM.write mutable (2 * x + 1) vy
+            frozen <- V.unsafeFreeze mutable
+            pure frozen
+
+uploadStereoVertices :: GL.BufferObject -> V.Vector Float -> [Int] -> Int -> IO ()
+uploadStereoVertices buffer vertices dirtySegs' n = do
+    oldBuffer <- GL.get (GL.bindBuffer GL.ArrayBuffer)
+    GL.bindBuffer GL.ArrayBuffer $= Just buffer
+    let floatBytes = sizeOf (0 :: Float)
+    V.unsafeWith vertices $ \base ->
+        forM_ dirtySegs' $ \k -> do
+            let lo = k * segSize
+                hi = Prelude.min n (lo + segSize)
+                byteOffset = lo * 2 * floatBytes
+                byteCount = (hi - lo) * 2 * floatBytes
+            GL.bufferSubData GL.ArrayBuffer GL.WriteToBuffer
+                (fromIntegral byteOffset)
+                (fromIntegral byteCount)
+                (castPtr (base `plusPtr` byteOffset))
+    GL.bindBuffer GL.ArrayBuffer $= oldBuffer
+
+ensureStereoBuffer :: V.Vector Float -> Bool -> [Int] -> Int -> IO GL.BufferObject
+ensureStereoBuffer vertices rebuild dirtySegs' n = do
+    current <- readIORef stereoBufferRef
+    let requiredFloats = 2 * n
+    case current of
+        Just target
+            | stereoBufferFloats target == requiredFloats -> do
+                when rebuild $
+                    uploadStereoVertices
+                        (stereoBufferObject target) vertices
+                        (dirtySegs (-1) 0 (Prelude.max 1 ((n + segSize - 1) `div` segSize)))
+                        n
+                when (not rebuild && not (null dirtySegs')) $
+                    uploadStereoVertices
+                        (stereoBufferObject target) vertices dirtySegs' n
+                pure (stereoBufferObject target)
+        _ -> do
+            forM_ current $ \target -> GL.deleteObjectName (stereoBufferObject target)
+            buffer <- GL.genObjectName
+            oldBuffer <- GL.get (GL.bindBuffer GL.ArrayBuffer)
+            GL.bindBuffer GL.ArrayBuffer $= Just buffer
+            V.unsafeWith vertices $ \base ->
+                GL.bufferData GL.ArrayBuffer $=
+                    ( fromIntegral (requiredFloats * sizeOf (0 :: Float))
+                    , castPtr base
+                    , GL.DynamicDraw )
+            GL.bindBuffer GL.ArrayBuffer $= oldBuffer
+            writeIORef stereoBufferRef $
+                Just (StereoBuffer buffer requiredFloats)
+            pure buffer
 
 stereoGraph :: World -> IO Frame
 stereoGraph w0 = do
@@ -224,34 +291,23 @@ stereoGraph w0 = do
         n     = V.length v
         idx   = sampleLRindex w0
         nSeg  = Prelude.max 1 ((n + segSize - 1) `div` segSize)
-        rho a = abs $ 0.98 * tanh (2 * a)
-        theta x = 2 * pi * fromIntegral x / fromIntegral n
-        segFrame k =
-            let lo = k * segSize
-                hi = Prelude.min n (lo + segSize)
-                pts = [ if odd x then polarPoint (rho (v `V.unsafeIndex` x)) (theta x + pi)
-                                 else polarPoint (rho (v `V.unsafeIndex` x)) (theta x)
-                      | x <- [lo .. hi - 1] ]
-            in stroke pts (rgba 1 1 1 0.02)
     lastSz <- readIORef segLastSzRef
-    last   <- readIORef segLastIdxRef
-    cache  <- readIORef segCacheRef
-    let cache'
-          | lastSz /= n = M.fromList [ (k, segFrame k) | k <- [0 .. nSeg - 1] ]
-          | otherwise   = foldl (\m k -> M.insert k (segFrame k) m) cache (dirtySegs last idx nSeg)
-        frs = [ f | (_, f) <- M.toAscList cache' ]
+    prev   <- readIORef segLastIdxRef
+    let rebuild = lastSz /= n || prev < 0
+        dirty = if rebuild then [0 .. nSeg - 1] else dirtySegs prev idx nSeg
+    vertices <- if rebuild
+        then pure (stereoVertices v n)
+        else updateStereoVertices v n dirty
+    writeIORef stereoVerticesRef vertices
+    buffer <- ensureStereoBuffer vertices rebuild dirty n
+    strip <- lineStripBufferPicture buffer n
+    let picture = Color (rgba 1 1 1 0.02) strip
     writeIORef segLastSzRef n
     writeIORef segLastIdxRef idx
-    writeIORef segCacheRef cache'
-    return $ Overlay frs
-polarPoint :: Double -> Double -> UnitPoint
-polarPoint rho theta = 
-    let x = realToFrac $ rho * cos theta 
-        y = realToFrac $ rho * sin theta
-    in (Relative x, Relative y)
-
-point :: Double -> Double -> UnitPoint
-point x y = (Relative $ realToFrac x, Relative $ realToFrac y)
+    return $ Sized $ \(w,h) ->
+        -- Match gloss-relative's Unit semantics: Relative 1.0 spans the
+        -- full reference dimension, not half of it.
+        Stretch (Just (w,h)) $ Scale (realToFrac w) (realToFrac h) picture
 
 debugAddBorders :: [Frame] -> [Frame]
 debugAddBorders = map debugAddBorder

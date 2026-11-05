@@ -2,17 +2,20 @@
 {-# OPTIONS_HADDOCK hide #-}
 
 module Graphics.Gloss.Internals.Rendering.Picture
-        (renderPicture)
+        (renderPicture, lineStripBufferPicture)
 where
 import Graphics.Gloss.Internals.Rendering.State
 import Graphics.Gloss.Internals.Rendering.Common
 import Graphics.Gloss.Internals.Rendering.Circle
 import Graphics.Gloss.Internals.Rendering.Polygon
 import Graphics.Gloss.Internals.Rendering.Bitmap
+import Graphics.Gloss.Internals.Rendering.Shader
 import Graphics.Gloss.Internals.Data.Picture
 import Graphics.Gloss.Internals.Data.Color
 import System.Mem.StableName
 import Foreign.ForeignPtr
+import Foreign.Ptr (nullPtr)
+import Foreign.Storable (sizeOf)
 import Data.IORef
 import Data.List
 import Control.Monad
@@ -20,6 +23,7 @@ import Graphics.Rendering.OpenGL                        (($=), get)
 import qualified Graphics.Rendering.OpenGL.GL           as GL
 import qualified Graphics.Rendering.OpenGL.GLU.Errors   as GLU
 import qualified Graphics.UI.GLUT                       as GLUT
+import System.IO.Unsafe (unsafePerformIO)
 
 
 -- | Render a picture into the current OpenGL context.
@@ -170,7 +174,9 @@ drawPicture state circScale picture
             , rectSize = imgSectionSize }
           imgData@BitmapData
           { bitmapSize = (width, height)
-          , bitmapCacheMe = cacheMe }
+          , bitmapCacheMe = cacheMe
+          , bitmapTexture = mbTexture
+          , bitmapTint = tint }
           ->
            do
             let rowInfo =
@@ -205,46 +211,105 @@ drawPicture state circScale picture
                       BottomToTop -> defTexCoords
                       TopToBottom -> reverse defTexCoords
 
-            -- Load the image data into a texture,
-            -- or grab it from the cache if we've already done that before.
-            tex     <- loadTexture (stateTextures state) imgData cacheMe
+            let drawWith texObj wrapping filtering = do
+                  GL.textureWrapMode GL.Texture2D GL.S $= wrapping
+                  GL.textureWrapMode GL.Texture2D GL.T $= wrapping
+                  GL.textureFilter   GL.Texture2D      $= filtering
+                  GL.texture GL.Texture2D $= GL.Enabled
+                  GL.textureFunction      $= GL.Combine
+                  GL.textureBinding GL.Texture2D $= Just texObj
 
-            -- Set up wrap and filtering mode
-            GL.textureWrapMode GL.Texture2D GL.S $= (GL.Repeated, GL.Repeat)
-            GL.textureWrapMode GL.Texture2D GL.T $= (GL.Repeated, GL.Repeat)
-            GL.textureFilter   GL.Texture2D      $= ((GL.Nearest, Nothing), GL.Nearest)
+                  oldColor <- get GL.currentColor
+                  when (not tint) $
+                    GL.currentColor $= GL.Color4 1.0 1.0 1.0 1.0
+                  GL.renderPrimitive GL.Polygon $
+                    forM_ (bitmapPath (fromIntegral $ fst imgSectionSize)
+                                      (fromIntegral $ snd imgSectionSize) `zip` rowInfo) $
+                    \((polygonCoordX, polygonCoordY), (textureCoordX,textureCoordY)) ->
+                    do
+                      GL.texCoord $ GL.TexCoord2 (gf textureCoordX) (gf textureCoordY)
+                      GL.vertex   $ GL.Vertex2   (gf polygonCoordX) (gf polygonCoordY)
+                  GL.currentColor $= oldColor
+                  GL.texture GL.Texture2D $= GL.Disabled
 
-            -- Enable texturing
-            GL.texture GL.Texture2D $= GL.Enabled
-            GL.textureFunction      $= GL.Combine
+            case mbTexture of
+              Just textureId ->
+                drawWith
+                  (GL.TextureObject (fromIntegral textureId))
+                  (GL.Repeated, GL.ClampToEdge)
+                  ((GL.Linear', Nothing), GL.Linear')
 
-            -- Set current texture
-            GL.textureBinding GL.Texture2D $= Just (texObject tex)
+              Nothing -> do
+                -- Load the image data into a texture,
+                -- or grab it from the cache if we've already done that before.
+                tex <- loadTexture (stateTextures state) imgData cacheMe
+                drawWith
+                  (texObject tex)
+                  (GL.Repeated, GL.Repeat)
+                  ((GL.Nearest, Nothing), GL.Nearest)
 
-            -- Set to opaque
-            oldColor <- get GL.currentColor
-            GL.currentColor $= GL.Color4 1.0 1.0 1.0 1.0
+                -- Free uncachable texture objects.
+                freeTexture tex
 
-            -- Draw textured polygon
-            GL.renderPrimitive GL.Polygon $
-              forM_ (bitmapPath (fromIntegral $ fst imgSectionSize)
-                                (fromIntegral $ snd imgSectionSize) `zip` rowInfo) $
-              \((polygonCoordX, polygonCoordY), (textureCoordX,textureCoordY)) ->
-              do
-                GL.texCoord $ GL.TexCoord2 (gf textureCoordX) (gf textureCoordY)
-                GL.vertex   $ GL.Vertex2   (gf polygonCoordX) (gf polygonCoordY)
-
-            -- Restore color
-            GL.currentColor $= oldColor
-
-            -- Disable texturing
-            GL.texture GL.Texture2D $= GL.Disabled
-
-            -- Free uncachable texture objects.
-            freeTexture tex
+        LineStripBuffer bufferId vertexCount
+         -> do
+            -- Coordinates are transformed by Gloss's normal model-view
+            -- matrix, so callers can place the strip in a scaled Frame.
+            registered <- readIORef lineStripBuffersRef
+            case lookup bufferId registered of
+                Nothing -> error $ "Unknown GPU line buffer " ++ show bufferId
+                Just buffer -> do
+                    currentColor <- get GL.currentColor
+                    oldBuffer <- get (GL.bindBuffer GL.ArrayBuffer)
+                    oldAttrib <- get (GL.vertexAttribArray (GL.AttribLocation 0))
+                    withShader lineStripShader $ do
+                        case currentColor of
+                            GL.Color4 r g b a ->
+                                uniform4f lineStripShader "uColor" (r, g, b, a)
+                        GL.bindBuffer GL.ArrayBuffer $= Just buffer
+                        GL.vertexAttribArray (GL.AttribLocation 0) $= GL.Enabled
+                        GL.vertexAttribPointer (GL.AttribLocation 0) $=
+                            (GL.ToFloat, GL.VertexArrayDescriptor
+                                2 GL.Float (fromIntegral (2 * sizeOf (0 :: Float))) nullPtr)
+                        GL.drawArrays GL.LineStrip 0 (fromIntegral vertexCount)
+                        GL.vertexAttribArray (GL.AttribLocation 0) $= GL.Disabled
+                    GL.bindBuffer GL.ArrayBuffer $= oldBuffer
+                    GL.vertexAttribArray (GL.AttribLocation 0) $= oldAttrib
 
         Pictures ps
          -> mapM_ (drawPicture state circScale) ps
+
+lineStripShader :: Shader
+lineStripShader = unsafePerformIO $ compileShader
+    (unlines
+        [ "#version 120"
+        , "attribute vec2 aPos;"
+        , "void main() {"
+        , "  gl_Position = gl_ModelViewProjectionMatrix * vec4(aPos, 0.0, 1.0);"
+        , "}"
+        ])
+    (unlines
+        [ "#version 120"
+        , "uniform vec4 uColor;"
+        , "void main() { gl_FragColor = uColor; }"
+        ])
+{-# NOINLINE lineStripShader #-}
+
+lineStripBuffersRef :: IORef [(Int, GL.BufferObject)]
+lineStripBuffersRef = unsafePerformIO (newIORef [])
+{-# NOINLINE lineStripBuffersRef #-}
+
+lineStripBufferPicture :: GL.BufferObject -> Int -> IO Picture
+lineStripBufferPicture buffer vertexCount = do
+    registered <- readIORef lineStripBuffersRef
+    case find (\(_, b) -> b == buffer) registered of
+        Just (key, _) -> pure (LineStripBuffer key vertexCount)
+        Nothing -> do
+            let key = case registered of
+                        [] -> 1
+                        xs -> fst (maximum xs) + 1
+            writeIORef lineStripBuffersRef ((key, buffer) : registered)
+            pure (LineStripBuffer key vertexCount)
 
 -- Errors ---------------------------------------------------------------------
 checkErrors :: String -> IO ()
@@ -319,7 +384,7 @@ loadTexture refTextures imgData@BitmapData{ bitmapSize=(width,height) } cacheMe
 -- | Install a texture into the OpenGL context,
 --   returning the new texture handle.
 installTexture :: BitmapData -> IO Texture
-installTexture bitmapData@(BitmapData _ fmt (width,height) cacheMe fptr)
+installTexture bitmapData@(BitmapData _ fmt (width,height) cacheMe fptr _ _)
  = do
         let glFormat
                 = case pixelFormat fmt of

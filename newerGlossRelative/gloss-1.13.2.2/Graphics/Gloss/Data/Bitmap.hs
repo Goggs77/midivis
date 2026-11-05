@@ -8,6 +8,7 @@ module Graphics.Gloss.Data.Bitmap
         , bitmapDataOfForeignPtr
         , bitmapOfByteString
         , bitmapDataOfByteString
+        , bitmapDataOfTintableByteString
         , bitmapOfBMP
         , bitmapDataOfBMP
         , loadBMP)

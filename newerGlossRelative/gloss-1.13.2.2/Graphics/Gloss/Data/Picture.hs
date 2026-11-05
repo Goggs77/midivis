@@ -12,6 +12,7 @@ module Graphics.Gloss.Data.Picture
         , text
         , bitmap
         , bitmapSection
+        , lineStripBufferPicture
         -- , bitmap
         , color
         , translate, rotate, scale

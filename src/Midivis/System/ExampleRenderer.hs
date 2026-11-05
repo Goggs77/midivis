@@ -6,28 +6,22 @@ import Midivis.System.MidiQuery
 import Midivis.Midi.MidiParser (MidiEvent)
 import Midivis.World 
 import Midivis.Util.Math
-import Midivis.Synth.Render (pushVoiceToFx, SynthFx(..))
-import Midivis.Resources.Tuning.All (allTunings)
-import Midivis.Synth.Preset (allPresets)
+import Midivis.Synth.Render (SynthFx(..))
 import Midivis.Tuning.Poly
 import Midivis.Tuning.Corpus
+import Midivis.System.Selection
 
 import Graphics.Gloss.Relative
 import Graphics.Gloss.Interface.Environment
-import Sound.RtMidi (InputDevice)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
-import Data.IORef (readIORef, writeIORef)
+import Data.IORef (readIORef)
 import qualified Data.Text as T
 import qualified Data.StorableVector as SV
 import qualified Data.Vector.Storable as V
 import qualified Data.Vector.Storable.Mutable as VM
-import Midivis.Tuning.Ascl (calibrateA4, hasReferencePitch)
-import Midivis.Resources.Tuning.All
 import Midivis.Synth.VoicePool (readVoice)
-import Data.Maybe (mapMaybe)
 import Midivis.Synth.Types (VoiceParams(..), EnvelopeState (..), isReleasingOrIdle, isIdle)
-import Control.Monad (when)
 import Midivis.Util.Text
 import Midivis.Synth.CtrlBus
 
@@ -83,50 +77,12 @@ stepAngle w0 = do
     } 
     else return w0
 
+-- | Apply immediate press behavior and time-based held-key repeats.
 stepTuning :: World -> IO World
-stepTuning w0 = if totalFrames w0 `rem` 90 == 0 && tuningScroll w0 /= Stop
-    then do 
-        let i = case (tuningScroll w0) of
-                Next -> 1
-                Stop -> 0
-                Prev -> (-1)
-            newIndex = (sclIndex w0 + (length allTunings + i)) `rem` (length allTunings)
-            tun = allTunings !! newIndex
-            -- Prefer the file's own @ABL REFERENCE_PITCH (parseAscl already
-            -- applied it at compile time); fall back to A4 = freqA4 when the
-            -- file declares none.
-            chosen = if hasReferencePitch tun
-                        then tun
-                        else calibrateA4 tun (freqA4 w0)
-        return w0 {
-        sclIndex = newIndex,
-        sclOfChoice = chosen
-        }
-    else return w0
+stepTuning = advanceTuningSelection
 
--- | Preset switching (',' / '.'): scroll presetIndex, publish the new voice
---   to the audio callback (sfVoice) and push its FX/reverb parameters into
---   the live effect targets (glides, not clicks).
 stepPreset :: World -> IO World
-stepPreset w0 = if totalFrames w0 `rem` 90 == 0 && presetScroll w0 /= Stop
-    then do
-        let i = case (presetScroll w0) of
-                Next -> 1
-                Stop -> 0
-                Prev -> (-1)
-            newIndex = (presetIndex w0 + (length allPresets + i)) `rem` (length allPresets)
-            newVoice = allPresets !! newIndex
-        mfx <- readIORef (synthFxRef w0)
-        case mfx of
-            Just fx -> do
-                writeIORef (sfVoice fx) newVoice
-                pushVoiceToFx newVoice fx
-            Nothing -> return ()
-        return w0 {
-        presetIndex = newIndex,
-        activeVoice = newVoice
-        }
-    else return w0
+stepPreset = advancePresetSelection
 
 -- | This is the only function where gui thread reads 'VoicePool'
 stepChord :: World -> IO World

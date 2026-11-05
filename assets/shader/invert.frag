@@ -16,5 +16,7 @@ void main() {
     //vec2 distortedUV = center + delta * factor;
     //vec4 c = texture2D(uTex, distortedUV);
     vec4 c = texture2D(uTex, vUV / uTexSize);
-    gl_FragColor = vec4(1.0 - c.rgb, c.a);
+    // The FX result is composited as opaque output.  Setting alpha here
+    // avoids a full-frame CPU pass over the resolved pixels.
+    gl_FragColor = vec4(1.0 - c.rgb, 1.0);
 }

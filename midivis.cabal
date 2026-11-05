@@ -114,6 +114,7 @@ library
                         
                         Midivis.Util.Text,
                         Midivis.Synth.KeyboardLayout,
+                        Midivis.System.Selection,
                         Midivis.Resources.FontTH
 
     -- LANGUAGE extensions used by modules in this package.
@@ -123,8 +124,9 @@ library
     -- We can't use GLFW-only since gloss always calls GLUT
     build-depends:    base ^>=4.20.1.0,
                       array,
-                      gloss-relative,
+                      gloss-relative-localmod,
                       gloss,
+                      OpenGL,
                       random,
                       linear,
                       vector,
@@ -242,7 +244,7 @@ test-suite midivis-test
                       midivis,
                       stm ^>=2.5.3.1,
                       vector,
-                      gloss-relative
+                      gloss-relative-localmod
 
 -- | Full-chain voicing test: drives the preset voices through every stage of
 --   the signal chain and logs per-stage level monitoring to a .log file.

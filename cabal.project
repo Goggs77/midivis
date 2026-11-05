@@ -3,4 +3,4 @@ packages: .
           ./rtmidifix/portaudio-0.2.4
           ./newerGlossRelative/gloss-1.13.2.2
           ./newerGlossRelative/gloss-rendering-1.13.2.1
-          ./newerGlossRelative/gloss-relative
+          ./newerGlossRelative/gloss-relative-localmod
