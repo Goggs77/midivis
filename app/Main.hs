@@ -16,7 +16,6 @@ import Midivis.Util.Math (fromDBFS)
 import Midivis.Resources.Audio.IR
 import Sound.PortAudio
 import qualified Sound.PortAudio.Base as Base
-import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
 import Control.Exception (try, SomeException)
 import Data.IORef (newIORef, readIORef, writeIORef, IORef)
@@ -26,17 +25,18 @@ import Foreign.C.Types (CFloat)
 import Foreign.ForeignPtr (newForeignPtr_, withForeignPtr)
 import Foreign.Marshal.Array (allocaArray)
 import Foreign.Storable (poke, pokeElemOff, sizeOf)
-import Foreign.Ptr (plusPtr, Ptr)
-import Control.Monad (forM_, forM, forever, when)
-import Data.List (maximumBy)
-import Data.Function (on)
-import Data.Maybe (catMaybes)
+import Foreign.Ptr (plusPtr)
+import Control.Monad (forM_, forever, void, when)
+import Data.Char (toLower)
 import GHC.Conc
 import GHC.IO.Encoding
+import System.Environment (lookupEnv)
 
 main :: IO ()
 main = do
     setLocaleEncoding utf8
+    debug <- maybe False ((`elem` ["1", "true", "yes", "on"]) . map toLower)
+        <$> lookupEnv "MIDIVIS_DEBUG"
     -- Use all available cores (equivalent to +RTS -N)
     cores <- getNumCapabilities
     setNumCapabilities $ min 4 cores
@@ -54,7 +54,7 @@ main = do
         -- advances it, the engine reads it to stamp note onsets
         smpRef = sampleCounter w0s
     let fpb = 1024
-        nch = 2
+        nch = 2 :: Int
         sr  = defSampleRate
     ir' <- ir
     -- Active voice (from the World; preset switching updates it live).
@@ -62,7 +62,8 @@ main = do
     let activeV = activeVoice w0s
         rv      = vReverb activeV
     -- [DIAG] log IR stats
-    hPutStrLn stderr $ "[Reverb] IR samples=" ++ show (length ir') ++
+    when debug $ hPutStrLn stderr $
+        "[Reverb] IR samples=" ++ show (length ir') ++
         " peak=" ++ show (maximum (0 : map abs ir')) ++
         " sum=" ++ show (sum ir')
     -- === 1b. Convolution reverb: load IR file embed ===
@@ -99,15 +100,15 @@ main = do
 
     -- === 2. Start synth engine (forkIO mainLoop) ===
     initSynth w0TVar
-    hPutStrLn stderr "[Main] Synth engine started"
+    when debug $ hPutStrLn stderr "[Main] Synth engine started"
 
     -- === 3. Start PortAudio output (forkIO thread, callback mode) ===
     _ <- forkIO $ do
-        hPutStrLn stderr "[Audio] Initializing PortAudio..."
+        when debug $ hPutStrLn stderr "[Audio] Initializing PortAudio..."
         r <- withPortAudio $ do
             -- probe devices 0..4: open each, blast a 440Hz test tone, keep the
             -- first one that produces no error (device 0 is often a phantom).
-            let probe devIdx = do
+            let probe (devIdx :: Int) = do
                     let outParams = Just (StreamParameters (fromIntegral devIdx) (fromIntegral nch) (Base.PaTime 0.1))
                     result <- withStream
                         Nothing
@@ -140,13 +141,13 @@ main = do
                         Right dev -> pure (Right dev)
                         Left _ | devIdx < 4 -> probe (devIdx + 1)
                         Left err -> pure $ Left err
-            devResult <- probe 0
+            devResult <- probe (0 :: Int)
             case devResult of
                 Left err -> do
                     hPutStrLn stderr $ "[Audio] No working device: " ++ show err
                     pure $ Left err
-                Right devIdx -> do
-                    hPutStrLn stderr $ "[Audio] Using device " ++ show devIdx
+                Right (devIdx :: Int) -> do
+                    when debug $ hPutStrLn stderr $ "[Audio] Using device " ++ show devIdx
                     let outParams = Just (StreamParameters (fromIntegral devIdx) (fromIntegral nch) (Base.PaTime 0.1))
                     -- Compressor gain state, carried across callbacks.
                     phVar <- newIORef (1.0 :: Double)
@@ -206,7 +207,7 @@ main = do
                         callback _time _flags nFrames _inp outPtr = do
                             n <- readIORef cbCount
                             writeIORef cbCount (n + 1)
-                            when (n `mod` 2000 == 0) $
+                            when (debug && n `mod` 2000 == 0) $
                                 hPutStrLn stderr $ "[Audio] callback alive, frame="
                                     ++ show n
                             r <- try (renderCallback vp sr (fromIntegral nFrames) outPtr fx bus)
@@ -234,12 +235,12 @@ main = do
                                     hPutStrLn stderr $ "[Audio] startStream error: " ++ show e
                                     return $ Left e
                                 Nothing -> do
-                                    hPutStrLn stderr "[Audio] PortAudio stream active (callback)"
+                                    when debug $ hPutStrLn stderr "[Audio] PortAudio stream active (callback)"
                                     -- [DIAG] Watchdog: print the callback counter
                                     -- every 2 s.  delta==0 ⇒ the callback thread
                                     -- died (silent stream); delta keeps growing
                                     -- but no sound ⇒ the stream itself stopped.
-                                    _ <- forkIO $ monitorLoop cbCount
+                                    when debug $ void $ forkIO (monitorLoop cbCount)
                                     forever $ threadDelay maxBound
         case r of
             Left err -> hPutStrLn stderr $ "[Audio] PortAudio error: " ++ show err
@@ -249,10 +250,10 @@ main = do
     threadDelay 100000
 
     -- === 4. Start Gloss visualization (blocks main thread) ===
-    hPutStrLn stderr "[Main] Starting Gloss visualization..."
+    when debug $ hPutStrLn stderr "[Main] Starting Gloss visualization..."
     drawExampleRelative w0TVar
 
-    hPutStrLn stderr "[Main] Shutdown"
+    when debug $ hPutStrLn stderr "[Main] Shutdown"
 
 -- | [DIAG] Watchdog thread: reports the audio callback counter every 2 s.
 monitorLoop :: IORef Int -> IO ()

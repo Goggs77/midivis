@@ -15,7 +15,7 @@
 module Main where
 
 import Prelude
-import Control.Monad (forM_, forM, when)
+import Control.Monad (forM_, when)
 import Data.Array.IO (newArray)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Foreign.C.Types (CFloat)
@@ -98,6 +98,10 @@ mkSynthFx = do
     eqFxRef       <- newIORef =<< newEqFx
     chorusFxRef   <- newIORef =<< newChorusFx
     ensembleFxRef <- newIORef =<< newEnsembleFx
+    vFilterRef    <- newIORef =<< newVFilterState
+    vFreshRef     <- newIORef =<< newVFilterFresh
+    rmsRef        <- newIORef (0.0, 0.0 :: Double)
+    sampleRef     <- newIORef (0.0, 0.0 :: Double)
     voiceRef      <- newIORef (head allPresets)
     phVar         <- newIORef (1.0 :: Double)
     return $ SynthFx
@@ -117,7 +121,11 @@ mkSynthFx = do
         , sfEqRef        = eqFxRef
         , sfChorusRef    = chorusFxRef
         , sfEnsembleRef  = ensembleFxRef
+        , sfVFilterRef   = vFilterRef
+        , sfVFreshRef    = vFreshRef
         , sfVoice        = voiceRef
+        , sfRmsRef       = rmsRef
+        , sfSampleRef    = sampleRef
         }
 
 -- | Render one block through the full chain, sampling levels at every stage

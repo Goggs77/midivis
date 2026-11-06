@@ -42,9 +42,6 @@ drawExampleRelative w0TVar = do
     (_, h) <- getScreenSize
     -- 1151 and 809 are primes for no special reason, keep it that way
     let size = (round (1151.0 * ratio), round (809.0 * ratio)) where ratio = fromIntegral h/1080.0
-    case inputDevice of
-        Nothing -> putStrLn "[Debug] No MIDI keyboard — computer keyboard active"
-        Just _  -> putStrLn "[Debug] Midi Initialized"
     playRelativeIO
         (InWindow "Midivis" size (300,100))
         black

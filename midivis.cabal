@@ -188,6 +188,7 @@ executable midivis
                       -with-rtsopts=-M256M
                       -with-rtsopts=--nonmoving-gc
                       -with-rtsopts=-A64m
+                      -optl-mwindows
 
     -- .hs or .lhs file containing the Main module.
     main-is:          Main.hs
